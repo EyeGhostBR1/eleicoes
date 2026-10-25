@@ -36,6 +36,8 @@ const K_MIN = 1;
 const K_MAX = 80;
 /** zoom máximo ao focar um município pequeno */
 const K_FOCO_MUN = 28;
+/** a partir deste zoom o mapa troca os estados pelos municípios */
+const K_MUN = 2.2;
 
 /** Ordem de carregamento padrão (maiores eleitorados primeiro). */
 const ORDEM_UF = [
@@ -67,6 +69,12 @@ export interface ZoomMapProps {
   getFill: (ibge: string) => string;
   /** conteúdo do tooltip por código IBGE */
   getTooltip?: (ibge: string) => ReactNode;
+  /**
+   * Visão por estado: sem zoom, o mapa mostra as UFs com estas cores (sigla minúscula); os
+   * municípios aparecem a partir do zoom K_MUN. Sem getFillUf, mostra sempre os municípios.
+   */
+  getFillUf?: (uf: string) => string;
+  getTooltipUf?: (uf: string) => ReactNode;
   /** clique/toque num município (null = clique fora) */
   onSelect?: (ibge: string | null) => void;
   selectedId?: string | null;
@@ -187,9 +195,9 @@ function useHover(store: HoverStore) {
   return useSyncExternalStore(store.subscribe, store.get, () => null);
 }
 
-function ContornoHover({ store, porId }: { store: HoverStore; porId: Map<string, Shape> }) {
+function ContornoHover({ store, porId, ufs }: { store: HoverStore; porId: Map<string, Shape>; ufs: Map<string, Shape> }) {
   const h = useHover(store);
-  const s = h ? porId.get(h.id) : null;
+  const s = h ? (porId.get(h.id) ?? ufs.get(h.id)) : null;
   if (!s) return null;
   return (
     <path
@@ -288,6 +296,8 @@ const BotaoMapa = ({ onClick, rotulo, children }: { onClick: () => void; rotulo:
 export default function ZoomMap({
   getFill,
   getTooltip,
+  getFillUf,
+  getTooltipUf,
   onSelect,
   selectedId,
   prioridadeUf,
@@ -305,6 +315,9 @@ export default function ZoomMap({
   const svgRef = useRef<SVGSVGElement>(null);
   const gRef = useRef<SVGGElement>(null);
   const munGRef = useRef<SVGGElement>(null);
+  // nível de detalhe: estados (sem zoom) ou municípios (com zoom)
+  const [nivelZoom, setNivelZoom] = useState<"uf" | "mun">("uf");
+  const nivelRef = useRef<"uf" | "mun">("uf");
   const ufGRef = useRef<SVGGElement>(null);
   const tRef = useRef<T>({ k: 1, x: 0, y: 0 });
   const animRef = useRef<number | null>(null);
@@ -362,6 +375,11 @@ export default function ZoomMap({
     for (const l of Object.values(munPorUf)) for (const s of l) m.set(s.id, s);
     return m;
   }, [munPorUf]);
+  const ufPorId = useMemo(() => new Map((base?.ufs ?? []).map((u) => [`uf:${u.id}`, u])), [base]);
+  const tooltip = useCallback(
+    (id: string) => (id.startsWith("uf:") ? getTooltipUf?.(id.slice(3)) : getTooltip?.(id)),
+    [getTooltip, getTooltipUf],
+  );
   const porIdRef = useRef(porId);
   porIdRef.current = porId;
 
@@ -372,7 +390,13 @@ export default function ZoomMap({
     // nível de detalhe: fronteiras municipais finas no Brasil inteiro, mais visíveis com zoom
     if (munGRef.current) munGRef.current.style.strokeWidth = k < 1.8 ? "0.12" : k < 4 ? "0.3" : k < 10 ? "0.55" : "0.8";
     if (ufGRef.current) ufGRef.current.style.strokeWidth = k < 3 ? "0.9" : "1.6";
-  }, []);
+    const nivel = k >= K_MUN ? "mun" : "uf";
+    if (nivel !== nivelRef.current) {
+      nivelRef.current = nivel;
+      setNivelZoom(nivel);
+      hover.set(null); // o alvo do tooltip (estado ↔ município) deixou de existir
+    }
+  }, [hover]);
 
   const limitar = useCallback(
     (t: T): T => {
@@ -426,9 +450,9 @@ export default function ZoomMap({
   );
 
   const focarCaixa = useCallback(
-    (b: Shape["b"], kMax = K_MAX) => {
+    (b: Shape["b"], kMax = K_MAX, kMin = K_MIN) => {
       const [x0, y0, x1, y1] = b;
-      const k = Math.min(kMax, 0.88 / Math.max((x1 - x0) / W, (y1 - y0) / H, 1e-6));
+      const k = Math.max(kMin, Math.min(kMax, 0.88 / Math.max((x1 - x0) / W, (y1 - y0) / H, 1e-6)));
       animarPara({ k, x: W / 2 - (k * (x0 + x1)) / 2, y: H / 2 - (k * (y0 + y1)) / 2 });
     },
     [animarPara, H],
@@ -452,20 +476,26 @@ export default function ZoomMap({
 
   const reset = useCallback(() => animarPara({ k: 1, x: 0, y: 0 }), [animarPara]);
 
+  // foca um estado já no nível dos municípios
+  const focarUf = useCallback(
+    (uf: string) => {
+      const s = base?.ufs.find((u) => u.id === uf);
+      if (s) focarCaixa(s.b, K_MAX, K_MUN + 0.3);
+    },
+    [base, focarCaixa],
+  );
+
   useImperativeHandle(
     ref,
     () => ({
-      focarUf: (uf: string) => {
-        const s = base?.ufs.find((u) => u.id === uf);
-        if (s) focarCaixa(s.b);
-      },
+      focarUf,
       focarMun: (ibge: string) => {
         const s = porIdRef.current.get(ibge);
         if (s) focarCaixa(s.b, K_FOCO_MUN);
       },
       reset,
     }),
-    [base, focarCaixa, reset],
+    [focarUf, focarCaixa, reset],
   );
 
   // reaplica a transformação depois de cada render (o React reescreve o atributo do <g>)
@@ -583,6 +613,12 @@ export default function ZoomMap({
     if (!g || g.moveu || g.multi || e.type === "pointercancel") return;
     // toque/clique simples
     const id = g.alvo;
+    if (id?.startsWith("uf:")) {
+      // visão por estado: clicar num estado aproxima nele (e mostra os municípios)
+      hover.set(null);
+      focarUf(id.slice(3));
+      return;
+    }
     if (e.pointerType === "touch") hover.set(id ? { id, ...paraBox(e.clientX, e.clientY) } : null);
     onSelect?.(id);
   };
@@ -635,7 +671,8 @@ export default function ZoomMap({
   };
 
   // ---- render -----------------------------------------------------------------------
-  const selecionado = selectedId ? porId.get(selectedId) : null;
+  const nivel = getFillUf ? nivelZoom : "mun";
+  const selecionado = nivel === "mun" && selectedId ? porId.get(selectedId) : null;
   const larguraMax = `min(100%, calc(80vh * ${(W / H).toFixed(4)}))`;
 
   return (
@@ -686,13 +723,33 @@ export default function ZoomMap({
             aria-hidden
           >
             <g ref={gRef}>
-              {/* silhuetas das UFs ainda sem municípios */}
-              <g style={{ fill: "var(--map-empty, #e5e7eb)" }} pointerEvents="none">
-                {base.ufs.map((u) => (munPorUf[u.id] ? null : <path key={u.id} d={u.d} className="animate-pulse" />))}
-              </g>
+              {nivel === "uf" && getFillUf ? (
+                /* visão por estado (sem zoom) */
+                <g style={{ stroke: "var(--map-stroke, #fff)", strokeLinejoin: "round", cursor: "pointer" }}>
+                  {base.ufs.map((u) => (
+                    <path
+                      key={u.id}
+                      data-id={`uf:${u.id}`}
+                      d={u.d}
+                      vectorEffect="non-scaling-stroke"
+                      style={{ fill: getFillUf(u.id), transition: "fill 300ms ease" }}
+                    />
+                  ))}
+                </g>
+              ) : (
+                /* silhuetas das UFs ainda sem municípios */
+                <g style={{ fill: "var(--map-empty, #e5e7eb)" }} pointerEvents="none">
+                  {base.ufs.map((u) => (munPorUf[u.id] ? null : <path key={u.id} d={u.d} className="animate-pulse" />))}
+                </g>
+              )}
               <g
                 ref={munGRef}
-                style={{ stroke: "var(--map-stroke, #fff)", strokeLinejoin: "round", cursor: onSelect ? "pointer" : undefined }}
+                style={{
+                  stroke: "var(--map-stroke, #fff)",
+                  strokeLinejoin: "round",
+                  cursor: onSelect ? "pointer" : undefined,
+                  display: nivel === "mun" ? undefined : "none",
+                }}
               >
                 {base.ufs.map((u) =>
                   munPorUf[u.id] ? <GrupoUf key={u.id} shapes={munPorUf[u.id]} getFill={getFill} /> : null,
@@ -712,12 +769,17 @@ export default function ZoomMap({
                     style={{ stroke: "var(--map-selected, currentColor)", strokeWidth: 2.4, strokeLinejoin: "round" }}
                   />
                 )}
-                <ContornoHover store={hover} porId={porId} />
+                <ContornoHover store={hover} porId={porId} ufs={ufPorId} />
               </g>
             </g>
           </svg>
         )}
-        <Tooltip store={hover} getTooltip={getTooltip} boxRef={boxRef} />
+        <Tooltip store={hover} getTooltip={tooltip} boxRef={boxRef} />
+        {base && nivel === "uf" && getFillUf && (
+          <p className="pointer-events-none absolute bottom-2 left-2 z-10 rounded-md bg-surface/90 px-2 py-1 text-xs text-muted shadow-sm">
+            Dê zoom ou clique num estado para ver os municípios
+          </p>
+        )}
         {base && (
           <div className="absolute right-2 top-2 z-10 flex flex-col gap-1">
             <BotaoMapa rotulo="Aproximar" onClick={() => zoomEm(W / 2, H / 2, 1.8, true)}>

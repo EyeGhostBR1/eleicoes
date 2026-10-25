@@ -7,7 +7,7 @@
 // uma vez. A UF em foco (selecionada/buscada) entra na frente da fila.
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { fetchJson, useParamsState } from "@/lib/client/hooks";
+import { fetchJson, useEstadosTurno, useParamsState } from "@/lib/client/hooks";
 import { compararMun } from "@/lib/compare";
 import { BLOCOS, TURNOS_FINALIZADOS, UFS, UF_POR_SIGLA } from "@/lib/config";
 import { fmtInt, fmtPct } from "@/lib/format";
@@ -16,9 +16,10 @@ import BuscaMunicipio from "../BuscaMunicipio";
 import { Legend } from "../map/Legend";
 import { SeletorMetrica, TooltipMapa, useMetrica, type DadosMapa } from "../MapaMetricas";
 import { METRICA_POR_ID, corMetrica, legendaMetrica, valoresDeLinhas, valoresTurnos, valorMetrica } from "../metricas";
-import { linhaTurnos, valTurnoDeMun } from "@/lib/turnos";
+import { linhaTurnos, valTurnoDeLive, valTurnoDeMun } from "@/lib/turnos";
+import { dadosMapaDeLinha, linhaEstado } from "../linhas";
 import { Card, DeltaPP, SectionTitle, corTextoBloco } from "../ui";
-import { useIndiceMunicipios } from "../useDados";
+import { useHistBr, useIndiceMunicipios } from "../useDados";
 import { Crescimento, DeltaVotos } from "../turnos/ComparacaoTurnos";
 import ZoomMap, { type ZoomMapControle } from "./ZoomMap";
 
@@ -296,6 +297,32 @@ export default function MapaInterativo() {
   const temTurnos = turno === 2 && t1.prontas > 0;
   const { metrica, setEscolha, disponivel } = useMetrica(temLive, temTurnos);
 
+  // visão por estado (antes do zoom): totalização por UF + histórico
+  const estados = useEstadosTurno(turno);
+  const estadosT1 = useEstadosTurno(turno === 2 ? 1 : null);
+  const histBr = useHistBr();
+  const dadosUf = useMemo(() => {
+    const m = new Map<string, DadosMapa>();
+    for (const u of UFS) {
+      if (u.sigla === "zz") continue;
+      const r = estados.data?.turno === turno ? estados.data.ufs[u.sigla] : null;
+      const d = dadosMapaDeLinha(linhaEstado(u, r, histBr.data?.ufs[u.sigla], turno, qs));
+      const r1 = estadosT1.data?.ufs[u.sigla];
+      m.set(u.sigla, r1 ? { ...d, ...valoresTurnos(linhaTurnos({ id: u.sigla, nome: u.nome }, valTurnoDeLive(r1), valTurnoDeLive(r))) } : d);
+    }
+    return m;
+  }, [estados.data, estadosT1.data, histBr.data, turno, qs]);
+  const getFillUf = useCallback((uf: string) => corMetrica(metrica, dadosUf.get(uf)), [metrica, dadosUf]);
+  const getTooltipUf = useCallback(
+    (uf: string) => (
+      <>
+        <TooltipMapa d={dadosUf.get(uf)} metrica={metrica} />
+        <p className="mt-1 text-[11px] opacity-70">Clique para ver os municípios</p>
+      </>
+    ),
+    [dadosUf, metrica],
+  );
+
   const getFill = useCallback((id: string) => corMetrica(metrica, dados.get(id)), [metrica, dados]);
   const getTooltip = useCallback((id: string) => <TooltipMapa d={dados.get(id)} metrica={metrica} />, [dados, metrica]);
   const legenda = useMemo(() => legendaMetrica(metrica), [metrica]);
@@ -399,6 +426,8 @@ export default function MapaInterativo() {
 
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
           <ZoomMap
+            getFillUf={getFillUf}
+            getTooltipUf={getTooltipUf}
             ref={ctrl}
             getFill={getFill}
             getTooltip={getTooltip}
