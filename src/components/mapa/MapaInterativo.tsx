@@ -8,16 +8,18 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { fetchJson, useParamsState } from "@/lib/client/hooks";
-import { compararMun, deltaPP, munPctBloco } from "@/lib/compare";
+import { compararMun } from "@/lib/compare";
 import { BLOCOS, TURNOS_FINALIZADOS, UFS, UF_POR_SIGLA } from "@/lib/config";
 import { fmtInt, fmtPct } from "@/lib/format";
 import type { HistMunFile, LiveMunRow, MunicipioTuple, MunicipiosResponse, Turno } from "@/lib/types";
 import BuscaMunicipio from "../BuscaMunicipio";
 import { Legend } from "../map/Legend";
 import { SeletorMetrica, TooltipMapa, useMetrica, type DadosMapa } from "../MapaMetricas";
-import { METRICA_POR_ID, corMetrica, legendaMetrica, valoresDeLinhas, valorMetrica } from "../metricas";
+import { METRICA_POR_ID, corMetrica, legendaMetrica, valoresDeLinhas, valoresTurnos, valorMetrica } from "../metricas";
+import { linhaTurnos, valTurnoDeMun } from "@/lib/turnos";
 import { Card, DeltaPP, SectionTitle, corTextoBloco } from "../ui";
 import { useIndiceMunicipios } from "../useDados";
+import { Crescimento, DeltaVotos } from "../turnos/ComparacaoTurnos";
 import ZoomMap, { type ZoomMapControle } from "./ZoomMap";
 
 const UFS_MAPA = UFS.filter((u) => u.sigla !== "zz").map((u) => u.sigla);
@@ -136,8 +138,8 @@ function Painel({
   const pt = compararMun("pt", row, hist, turno);
   const bo = compararMun("bolso", row, hist, turno);
   const temLive = row != null && row.vv > 0;
-  const pt1 = turno === 2 ? munPctBloco(rowT1, "pt") : null;
-  const bo1 = turno === 2 ? munPctBloco(rowT1, "bolso") : null;
+  // 1º × 2º turno: votos, num bloco separado das outras eleições
+  const lt = turno === 2 && rowT1 ? linhaTurnos({ id: cd, nome }, valTurnoDeMun(rowT1), valTurnoDeMun(row)) : null;
   return (
     <div className="space-y-3">
       <div className="flex items-start justify-between gap-2">
@@ -181,33 +183,12 @@ function Painel({
             votos={temLive ? [row!.pt, row!.bo] : null}
             destaque
           />
-          {turno === 2 && (
-            <LinhaPainel
-              rotulo="2026 · 1º turno"
-              pt={pt1}
-              bo={bo1}
-              nomes={["Lula", "Flávio"]}
-              votos={rowT1 && rowT1.vv > 0 ? [rowT1.pt, rowT1.bo] : null}
-            />
-          )}
           <LinhaPainel rotulo={`2022 · ${turno}º turno`} pt={pt.p2022} bo={bo.p2022} nomes={["Lula", "Jair"]} />
           <LinhaPainel rotulo={`2018 · ${turno}º turno`} pt={pt.p2018} bo={bo.p2018} nomes={["Haddad", "Jair"]} />
         </tbody>
       </table>
       {temLive && (
         <dl className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
-          {turno === 2 && (
-            <>
-              <dt className="text-muted">Lula vs 1º turno</dt>
-              <dd className="text-right">
-                <DeltaPP v={deltaPP(pt.p2026, pt1)} />
-              </dd>
-              <dt className="text-muted">Flávio vs 1º turno</dt>
-              <dd className="text-right">
-                <DeltaPP v={deltaPP(bo.p2026, bo1)} />
-              </dd>
-            </>
-          )}
           <dt className="text-muted">Lula vs 2022</dt>
           <dd className="text-right">
             <DeltaPP v={pt.d22} />
@@ -217,6 +198,31 @@ function Painel({
             <DeltaPP v={bo.d22} />
           </dd>
         </dl>
+      )}
+      {lt?.t1 && (
+        <div className="rounded-lg border border-line p-2.5">
+          <p className="mb-1 text-xs font-semibold text-strong">1º turno × 2º turno (votos)</p>
+          {(["pt", "bolso"] as const).map((b) => {
+            const d = b === "pt" ? lt.pt : lt.bo;
+            return (
+              <p key={b} className="flex items-baseline justify-between gap-2 text-sm">
+                <span className="font-medium" style={{ color: corTextoBloco(b) }}>
+                  {b === "pt" ? "Lula" : "Flávio"}
+                </span>
+                <span className="tabular-nums">
+                  {fmtInt(d.v1)} → {lt.t2 ? fmtInt(d.v2) : "—"}{" "}
+                  {lt.completo ? (
+                    <>
+                      <DeltaVotos v={d.dv} className="text-xs" /> <Crescimento v={d.cresc} className="text-xs" />
+                    </>
+                  ) : (
+                    <span className="text-xs text-muted">(apurando)</span>
+                  )}
+                </span>
+              </p>
+            );
+          })}
+        </div>
       )}
       <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
         <Link href={`/cidade/${uf}/${cd}${qs}`} className="font-medium text-strong underline underline-offset-2">
@@ -276,8 +282,7 @@ export default function MapaInterativo() {
       const d: DadosMapa = { nome: `${nome} (${uf.toUpperCase()})`, pa: row ? row.pa : null, ...v };
       if (turno === 2) {
         const r1 = t1.dados[uf]?.municipios[cd];
-        d.pt1 = munPctBloco(r1, "pt");
-        d.bo1 = munPctBloco(r1, "bolso");
+        if (r1) Object.assign(d, valoresTurnos(linhaTurnos({ id: cd, nome }, valTurnoDeMun(r1), valTurnoDeMun(row))));
       }
       m.set(ibge, d);
     }

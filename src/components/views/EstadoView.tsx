@@ -21,6 +21,7 @@ import ComparacaoTurnos from "../turnos/ComparacaoTurnos";
 import RankingTurnos from "../turnos/RankingTurnos";
 import { turnosExterior } from "../turnos/exterior";
 import { candidatosPorNumero, dadosMapaDeLinha, linhaMunicipio } from "../linhas";
+import { valoresTurnos } from "../metricas";
 import { Card, ErroCarga, SectionTitle, Skeleton, SkeletonLinhas } from "../ui";
 import { useExteriorOk, useHistBr, useHistMun, useIndiceMunicipios, useLiveOk, useMunicipiosOk } from "../useDados";
 
@@ -93,7 +94,7 @@ export default function EstadoView({ uf }: { uf: string }) {
       if (!t[3]) return;
       const d = dadosMapaDeLinha(linhas[i]);
       const lt = turnosMuns[i];
-      m.set(String(t[3]), lt ? { ...d, pt1: lt.pt.p1, bo1: lt.bo.p1 } : d);
+      m.set(String(t[3]), lt ? { ...d, ...valoresTurnos(lt) } : d);
     });
     return m;
   }, [tuplas, linhas, turnosMuns]);
@@ -202,7 +203,6 @@ export default function EstadoView({ uf }: { uf: string }) {
             linhas={turnosMuns}
             plural={pluralMun}
             carregando={munsT1.isLoading || muns.isLoading}
-            minApurado={30}
           />
         )}
         {segundo && exterior && (

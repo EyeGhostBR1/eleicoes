@@ -1,20 +1,21 @@
 "use client";
-// Rankings 1º × 2º turno: onde Lula e Flávio mais cresceram e onde cresceram menos / caíram,
-// em p.p. dos válidos ou em votos, e os lugares onde a liderança trocou de lado.
+// Rankings 1º × 2º turno: onde Lula e Flávio mais ganharam e onde perderam votos em relação aos
+// próprios votos do 1º turno (em % ou em número de votos), e onde a liderança trocou de lado.
+// Só entram lugares com o 2º turno 100% apurado (antes disso os votos não são comparáveis).
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { BLOCOS } from "@/lib/config";
-import { fmtInt, fmtPct } from "@/lib/format";
+import { fmtInt } from "@/lib/format";
 import type { LinhaTurnos } from "@/lib/turnos";
 import type { BlocoId } from "@/lib/types";
-import { Card, DeltaPP, Segmentado, SectionTitle, SkeletonLinhas, corTextoBloco } from "../ui";
-import { DeltaVotos, apuracaoCompleta } from "./ComparacaoTurnos";
+import { Card, Segmentado, SectionTitle, SkeletonLinhas, corTextoBloco } from "../ui";
+import { Crescimento, DeltaVotos } from "./ComparacaoTurnos";
 
-type Medida = "pp" | "votos";
+type Medida = "cresc" | "votos";
 
 function valor(l: LinhaTurnos, b: BlocoId, m: Medida): number | null {
   const d = b === "pt" ? l.pt : l.bo;
-  return m === "pp" ? d.dpp : d.dv;
+  return m === "cresc" ? d.cresc : d.dv;
 }
 
 function Nome({ l }: { l: LinhaTurnos }) {
@@ -33,26 +34,14 @@ function Nome({ l }: { l: LinhaTurnos }) {
   );
 }
 
-function Lista({
-  titulo,
-  itens,
-  b,
-  m,
-  vazio,
-}: {
-  titulo: string;
-  itens: LinhaTurnos[];
-  b: BlocoId;
-  m: Medida;
-  vazio: string;
-}) {
+function Lista({ titulo, itens, b, m }: { titulo: string; itens: LinhaTurnos[]; b: BlocoId; m: Medida }) {
   return (
     <div>
       <h4 className="mb-1.5 text-sm font-semibold" style={{ color: corTextoBloco(b) }}>
         {titulo}
       </h4>
       {itens.length === 0 ? (
-        <p className="text-xs text-muted">{vazio}</p>
+        <p className="text-xs text-muted">—</p>
       ) : (
         <ol className="space-y-1 text-sm">
           {itens.map((l, i) => {
@@ -64,16 +53,12 @@ function Lista({
                   <Nome l={l} />
                 </span>
                 <span className="flex shrink-0 items-baseline gap-2 text-xs">
-                  <span className="text-muted" title="1º turno → 2º turno (% dos válidos)">
-                    {fmtPct(d.p1, 1)} → {fmtPct(d.p2, 1)}
+                  <span className="tabular-nums text-muted" title="Votos no 1º turno → votos no 2º turno">
+                    {fmtInt(d.v1)} → {fmtInt(d.v2)}
                   </span>
-                  {m === "pp" ? (
-                    <DeltaPP v={d.dpp} semSufixo className="w-14 text-right" />
-                  ) : (
-                    <span className="w-20 text-right">
-                      <DeltaVotos v={d.dv} completo />
-                    </span>
-                  )}
+                  <span className="w-[4.5rem] text-right tabular-nums">
+                    {m === "cresc" ? <Crescimento v={d.cresc} /> : <DeltaVotos v={d.dv} />}
+                  </span>
                 </span>
               </li>
             );
@@ -88,77 +73,72 @@ export default function RankingTurnos({
   linhas,
   plural,
   carregando,
-  minApurado = 0,
   n = 10,
-  titulo = "Quem cresceu e quem caiu",
+  titulo = "Onde cada um ganhou e perdeu votos",
 }: {
-  titulo?: string;
   linhas: LinhaTurnos[];
   /** "estados", "municípios"... */
   plural: string;
   carregando?: boolean;
-  /** % mínimo apurado no 2º turno para entrar no ranking (evita parciais muito pequenas) */
-  minApurado?: number;
   n?: number;
+  titulo?: string;
 }) {
-  const [m, setM] = useState<Medida>("pp");
+  const [m, setM] = useState<Medida>("cresc");
 
   const r = useMemo(() => {
-    const comDados = linhas.filter((l) => l.t1 && l.t2 && (l.t2.pa ?? 0) >= minApurado);
-    const base = m === "votos" ? comDados.filter(apuracaoCompleta) : comDados;
+    const comparaveis = linhas.filter((l) => l.t1 && l.t2 && l.completo);
+    const emApuracao = linhas.filter((l) => l.t1 && l.t2 && !l.completo).length;
     const ordenar = (b: BlocoId, dir: 1 | -1) =>
-      base
+      comparaveis
         .filter((l) => valor(l, b, m) != null)
         .sort((x, y) => dir * ((valor(y, b, m) ?? 0) - (valor(x, b, m) ?? 0)) || y.peso - x.peso)
         .slice(0, n);
     const conta = (b: BlocoId) => {
-      let sobe = 0;
-      let desce = 0;
-      for (const l of base) {
-        const v = valor(l, b, m);
+      let ganhou = 0;
+      let perdeu = 0;
+      for (const l of comparaveis) {
+        const v = (b === "pt" ? l.pt : l.bo).dv;
         if (v == null) continue;
-        if (v > 0) sobe++;
-        else if (v < 0) desce++;
+        if (v > 0) ganhou++;
+        else if (v < 0) perdeu++;
       }
-      return { sobe, desce };
+      return { ganhou, perdeu };
     };
-    const viradas = comDados.filter((l) => l.virou).sort((x, y) => y.peso - x.peso);
     return {
-      total: base.length,
+      total: comparaveis.length,
+      emApuracao,
       ptMais: ordenar("pt", 1),
       ptMenos: ordenar("pt", -1),
       boMais: ordenar("bolso", 1),
       boMenos: ordenar("bolso", -1),
       contaPt: conta("pt"),
       contaBo: conta("bolso"),
-      viradas,
+      viradas: comparaveis.filter((l) => l.virou).sort((x, y) => y.peso - x.peso),
     };
-  }, [linhas, m, minApurado, n]);
+  }, [linhas, m, n]);
 
-  const unidade = m === "pp" ? "p.p. dos válidos" : "votos";
-  const resumoBloco = (b: BlocoId, c: { sobe: number; desce: number }) => (
+  const resumoBloco = (b: BlocoId, c: { ganhou: number; perdeu: number }) => (
     <p className="text-sm">
       <span className="font-semibold" style={{ color: corTextoBloco(b) }}>
         {BLOCOS[b].nomes["2026"]}
       </span>{" "}
-      cresceu em <strong>{fmtInt(c.sobe)}</strong> e caiu em <strong>{fmtInt(c.desce)}</strong> de {fmtInt(r.total)}{" "}
-      {plural} ({unidade})
+      ganhou votos em <strong>{fmtInt(c.ganhou)}</strong> e perdeu votos em <strong>{fmtInt(c.perdeu)}</strong> de{" "}
+      {fmtInt(r.total)} {plural}
     </p>
   );
+  const rotM = m === "cresc" ? "(% dos próprios votos do 1º turno)" : "(votos)";
 
   return (
     <Card className="p-4">
       <SectionTitle
-        sub={`Onde cada candidato mais cresceu e onde cresceu menos ou caiu do 1º para o 2º turno de 2026${
-          minApurado > 0 ? ` (só ${plural} com ao menos ${minApurado}% apurado no 2º turno)` : ""
-        }`}
+        sub={`Votos de cada candidato no 2º turno comparados com os votos dele no 1º turno de 2026 · só ${plural} com 100% apurado no 2º turno`}
         right={
           <Segmentado<Medida>
             rotulo="Medida"
             valor={m}
             onChange={setM}
             opcoes={[
-              { valor: "pp", rotulo: "Em p.p." },
+              { valor: "cresc", rotulo: "Em %" },
               { valor: "votos", rotulo: "Em votos" },
             ]}
           />
@@ -171,34 +151,31 @@ export default function RankingTurnos({
         <SkeletonLinhas n={6} />
       ) : r.total === 0 ? (
         <p className="text-sm text-muted">
-          {m === "votos"
-            ? `A comparação em votos aparece para ${plural} com 100% das seções do 2º turno apuradas.`
-            : `Disponível quando a apuração do 2º turno começar (a partir das 17h).`}
+          {r.emApuracao > 0
+            ? `Nenhum dos ${plural} terminou a apuração do 2º turno ainda (${fmtInt(r.emApuracao)} em apuração). O ranking aparece conforme cada um chega a 100%.`
+            : "Disponível quando a apuração do 2º turno começar."}
         </p>
       ) : (
         <div className="space-y-4">
           <div className="space-y-1">
             {resumoBloco("pt", r.contaPt)}
             {resumoBloco("bolso", r.contaBo)}
-            {m === "pp" && (
+            {r.emApuracao > 0 && (
               <p className="text-xs text-muted">
-                Em % dos válidos os dois tendem a subir quase em todo lugar, pois herdam os votos dos candidatos
-                eliminados no 1º turno; o ranking mostra onde cada um herdou mais (ou menos).
+                {fmtInt(r.emApuracao)} {plural} ainda em apuração ficam de fora até chegarem a 100%.
               </p>
             )}
           </div>
           <div className="grid grid-cols-1 gap-x-6 gap-y-4 md:grid-cols-2">
-            <Lista titulo="Lula: onde mais cresceu" itens={r.ptMais} b="pt" m={m} vazio="—" />
-            <Lista titulo="Lula: onde menos cresceu / caiu" itens={r.ptMenos} b="pt" m={m} vazio="—" />
-            <Lista titulo="Flávio: onde mais cresceu" itens={r.boMais} b="bolso" m={m} vazio="—" />
-            <Lista titulo="Flávio: onde menos cresceu / caiu" itens={r.boMenos} b="bolso" m={m} vazio="—" />
+            <Lista titulo={`Lula: onde mais ganhou ${rotM}`} itens={r.ptMais} b="pt" m={m} />
+            <Lista titulo={`Lula: onde menos ganhou ou perdeu ${rotM}`} itens={r.ptMenos} b="pt" m={m} />
+            <Lista titulo={`Flávio: onde mais ganhou ${rotM}`} itens={r.boMais} b="bolso" m={m} />
+            <Lista titulo={`Flávio: onde menos ganhou ou perdeu ${rotM}`} itens={r.boMenos} b="bolso" m={m} />
           </div>
           <div>
-            <h4 className="mb-1.5 text-sm font-semibold text-strong">
-              Liderança trocou de lado ({fmtInt(r.viradas.length)})
-            </h4>
+            <h4 className="mb-1.5 text-sm font-semibold text-strong">Liderança trocou de lado ({fmtInt(r.viradas.length)})</h4>
             {r.viradas.length === 0 ? (
-              <p className="text-xs text-muted">Nenhum dos {plural} mudou de líder entre o 1º e o 2º turno até agora.</p>
+              <p className="text-xs text-muted">Nenhum dos {plural} mudou de líder entre o 1º e o 2º turno.</p>
             ) : (
               <ul className="flex flex-wrap gap-1.5 text-xs">
                 {r.viradas.slice(0, 60).map((l) => (
@@ -217,9 +194,7 @@ export default function RankingTurnos({
                 {r.viradas.length > 60 && <li className="px-1 py-0.5 text-muted">e mais {fmtInt(r.viradas.length - 60)}…</li>}
               </ul>
             )}
-            {r.viradas.length > 0 && (
-              <p className="mt-1 text-xs text-muted">A cor indica quem passou à frente no 2º turno.</p>
-            )}
+            {r.viradas.length > 0 && <p className="mt-1 text-xs text-muted">A cor indica quem passou à frente no 2º turno.</p>}
           </div>
         </div>
       )}

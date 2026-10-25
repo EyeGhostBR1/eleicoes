@@ -1,10 +1,10 @@
 // Comparação 1º × 2º turno da MESMA eleição (2026): onde Lula e Flávio cresceram ou caíram.
 //
-// Duas medidas, porque contam histórias diferentes:
-//  - p.p. dos válidos: no 2º turno só restam dois candidatos, então o % de ambos tende a subir
-//    em quase todo lugar (herdam os votos dos eliminados). "Caiu em %" é raro e significativo.
-//  - votos absolutos: podem cair (mais abstenção, voto em branco/nulo) — mostra perda real.
-// E o saldo relativo: Δ margem (Lula − Flávio) entre os turnos = quem herdou mais.
+// A medida principal é o crescimento em VOTOS, comparado com os próprios votos do 1º turno
+// (absoluto e em %). O % dos válidos engana: com só dois candidatos no 2º turno, o % de ambos
+// sobe em quase todo lugar só porque os outros candidatos saíram.
+// Votos só são comparáveis com o 2º turno 100% apurado no lugar (`completo`); antes disso o
+// crescimento fica null (a contagem parcial pareceria queda).
 import { deltaPP, pct } from "./compare";
 import type { BlocoId, ExtAgregado, LiveMunRow, LiveResult } from "./types";
 
@@ -77,8 +77,10 @@ export interface DeltaTurno {
   dpp: number | null;
   v1: number | null;
   v2: number | null;
-  /** Δ votos (2º − 1º); só faz sentido com o 2º turno 100% apurado no lugar */
+  /** Δ votos (2º − 1º); só com o 2º turno 100% apurado no lugar */
   dv: number | null;
+  /** crescimento dos votos em relação aos do 1º turno (%): (v2 ÷ v1 − 1) × 100; só com 100% apurado */
+  cresc: number | null;
 }
 
 export interface LinhaTurnos {
@@ -91,8 +93,13 @@ export interface LinhaTurnos {
   t2: ValTurno | null;
   pt: DeltaTurno;
   bo: DeltaTurno;
-  /** Δ da margem Lula − Flávio (p.p.): positivo = Lula ganhou mais terreno que Flávio */
-  dMargem: number | null;
+  /** 2º turno 100% apurado no lugar (votos comparáveis com o 1º turno) */
+  completo: boolean;
+  /**
+   * Saldo de votos novos: (votos ganhos por Lula − votos ganhos por Flávio) ÷ válidos do 1º turno × 100.
+   * Positivo = Lula ganhou mais votos que Flávio entre os turnos. Só com 100% apurado.
+   */
+  saldo: number | null;
   /** quem liderava no 1º e lidera no 2º turno (só entre Lula e Flávio) */
   lider1: BlocoId | null;
   lider2: BlocoId | null;
@@ -107,12 +114,26 @@ function liderVal(v: ValTurno | null): BlocoId | null {
   return v.vpt > v.vbo ? "pt" : "bolso";
 }
 
+/** 2º turno totalmente apurado (pa = % de seções totalizadas / boletins recebidos). */
+export function turnoCompleto(v: ValTurno | null): boolean {
+  return (v?.pa ?? 0) >= 99.995;
+}
+
 function delta(v1: ValTurno | null, v2: ValTurno | null, b: BlocoId): DeltaTurno {
   const p1 = v1 ? (b === "pt" ? v1.pt : v1.bo) : null;
   const p2 = v2 ? (b === "pt" ? v2.pt : v2.bo) : null;
   const n1 = v1 ? (b === "pt" ? v1.vpt : v1.vbo) : null;
   const n2 = v2 ? (b === "pt" ? v2.vpt : v2.vbo) : null;
-  return { p1, p2, dpp: deltaPP(p2, p1), v1: n1, v2: n2, dv: n1 != null && n2 != null ? n2 - n1 : null };
+  const ok = n1 != null && n2 != null && turnoCompleto(v2);
+  return {
+    p1,
+    p2,
+    dpp: deltaPP(p2, p1),
+    v1: n1,
+    v2: n2,
+    dv: ok ? n2 - n1 : null,
+    cresc: ok && n1 > 0 ? (n2 / n1 - 1) * 100 : null,
+  };
 }
 
 export function linhaTurnos(
@@ -130,7 +151,8 @@ export function linhaTurnos(
     t2,
     pt,
     bo,
-    dMargem: pt.dpp != null && bo.dpp != null ? pt.dpp - bo.dpp : null,
+    completo: turnoCompleto(t2),
+    saldo: pt.dv != null && bo.dv != null && t1 && t1.vv > 0 ? ((pt.dv - bo.dv) / t1.vv) * 100 : null,
     lider1,
     lider2,
     virou: !!lider1 && !!lider2 && lider1 !== lider2,

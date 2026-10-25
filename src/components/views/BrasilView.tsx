@@ -19,6 +19,7 @@ import RankingTurnos from "../turnos/RankingTurnos";
 import { turnosExterior } from "../turnos/exterior";
 import CardExteriorHome from "../exterior/CardExteriorHome";
 import TeaserEstimativa from "../estimativa/TeaserEstimativa";
+import { valoresTurnos } from "../metricas";
 import { dadosMapaDeLinha, linhaBrasil, linhaEstado, linhaExteriorBU } from "../linhas";
 import { Card, ErroCarga, SectionTitle, Skeleton } from "../ui";
 import { useEstadosOk, useExteriorOk, useHistBr, useHistMun, useLiveOk } from "../useDados";
@@ -89,7 +90,7 @@ export default function BrasilView() {
         .map((l) => {
           const d = dadosMapaDeLinha(l);
           const t = t1Por.get(l.id);
-          return [l.id, t ? { ...d, pt1: t.pt.p1, bo1: t.bo.p1 } : d];
+          return [l.id, t ? { ...d, ...valoresTurnos(t) } : d];
         }),
     );
   }, [linhas, turnosUfs]);

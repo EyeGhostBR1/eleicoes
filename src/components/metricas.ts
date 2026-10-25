@@ -8,6 +8,7 @@
 //     (por isso o sinal é invertido antes de chamar swingColor)
 import { type LegendData, marginColor, marginLegend, swingColor, swingLegend } from "@/components/map/colors";
 import { deltaPP, margem, type LinhaComparacao } from "@/lib/compare";
+import type { LinhaTurnos } from "@/lib/turnos";
 import type { BlocoId } from "@/lib/types";
 
 export type MetricaId =
@@ -29,9 +30,26 @@ export interface ValoresLugar {
   bo22: number | null;
   pt18: number | null;
   bo18: number | null;
-  /** 1º turno de 2026 (% dos válidos) — só na comparação entre turnos (página no 2º turno) */
-  pt1?: number | null;
-  bo1?: number | null;
+  /**
+   * 1º × 2º turno de 2026 (só na página do 2º turno; null até o lugar ter 100% apurado):
+   * crescimento dos votos de cada um vs os próprios votos do 1º turno (%) e saldo de votos novos
+   * (votos ganhos por Lula − por Flávio, em % dos válidos do 1º turno).
+   */
+  gpt?: number | null;
+  gbo?: number | null;
+  saldoT?: number | null;
+  /** votos no 1º e no 2º turno (tooltip) */
+  vt?: { pt1: number | null; bo1: number | null; pt2: number | null; bo2: number | null } | null;
+}
+
+/** Campos de ValoresLugar da comparação entre turnos, a partir de uma LinhaTurnos. */
+export function valoresTurnos(l: LinhaTurnos): Pick<ValoresLugar, "gpt" | "gbo" | "saldoT" | "vt"> {
+  return {
+    gpt: l.pt.cresc,
+    gbo: l.bo.cresc,
+    saldoT: l.saldo,
+    vt: l.t1 ? { pt1: l.pt.v1, bo1: l.bo.v1, pt2: l.t2 ? l.pt.v2 : null, bo2: l.t2 ? l.bo.v2 : null } : null,
+  };
 }
 
 export interface Metrica {
@@ -42,6 +60,8 @@ export interface Metrica {
   live: boolean;
   /** compara 1º × 2º turno de 2026 (só no 2º turno) */
   turnos?: boolean;
+  /** saturação da escala de cor (padrão 15) */
+  escala?: number;
   /** bloco cuja variação é medida (métricas de swing) */
   bloco?: BlocoId;
   explicacao: string;
@@ -57,30 +77,35 @@ export const METRICAS: Metrica[] = [
   },
   {
     id: "ptT",
-    rotulo: "Lula: 2º − 1º turno",
+    rotulo: "Lula: votos 2º vs 1º turno",
     tipo: "swing",
     live: true,
     turnos: true,
     bloco: "pt",
-    explicacao: "Lula no 2º turno − Lula no 1º turno de 2026 (p.p. dos válidos). Vermelho forte: Lula cresceu muito; azul: Lula caiu.",
+    escala: 30,
+    explicacao:
+      "Crescimento dos votos de Lula no 2º turno em relação aos votos dele no 1º turno (%). Vermelho: ganhou votos; azul: perdeu. Só lugares com 100% apurado.",
   },
   {
     id: "boT",
-    rotulo: "Flávio: 2º − 1º turno",
+    rotulo: "Flávio: votos 2º vs 1º turno",
     tipo: "swing",
     live: true,
     turnos: true,
     bloco: "bolso",
-    explicacao: "Flávio no 2º turno − Flávio no 1º turno de 2026 (p.p. dos válidos). Azul forte: Flávio cresceu muito; vermelho: Flávio caiu.",
+    escala: 30,
+    explicacao:
+      "Crescimento dos votos de Flávio no 2º turno em relação aos votos dele no 1º turno (%). Azul: ganhou votos; vermelho: perdeu. Só lugares com 100% apurado.",
   },
   {
     id: "margemT",
-    rotulo: "Quem herdou mais (2º vs 1º)",
+    rotulo: "Quem ganhou mais votos",
     tipo: "swing",
     live: true,
     turnos: true,
+    escala: 10,
     explicacao:
-      "Variação da margem Lula − Flávio do 1º para o 2º turno (p.p.). Vermelho: Lula ganhou mais terreno que Flávio; azul: Flávio ganhou mais.",
+      "Votos ganhos por Lula − votos ganhos por Flávio entre os turnos, em % dos votos válidos do 1º turno. Vermelho: Lula ganhou mais; azul: Flávio ganhou mais. Só lugares com 100% apurado.",
   },
   {
     id: "pt22",
@@ -150,14 +175,11 @@ export function valorMetrica(id: MetricaId, v: ValoresLugar | null | undefined):
     case "margem18":
       return margem(v.pt18, v.bo18);
     case "ptT":
-      return deltaPP(v.pt26, v.pt1);
+      return v.gpt ?? null;
     case "boT":
-      return deltaPP(v.bo26, v.bo1);
-    case "margemT": {
-      const a = deltaPP(v.pt26, v.pt1);
-      const b = deltaPP(v.bo26, v.bo1);
-      return a != null && b != null ? a - b : null;
-    }
+      return v.gbo ?? null;
+    case "margemT":
+      return v.saldoT ?? null;
     case "pt22":
       return deltaPP(v.pt26, v.pt22);
     case "bo22":
@@ -182,7 +204,7 @@ export function corMetrica(id: MetricaId, v: ValoresLugar | null | undefined): s
       const d = valorMetrica(id, v);
       // swingColor: positivo = em direção ao PT (vermelho). Para o bloco Bolsonaro, inverte.
       const lado = METRICA_POR_ID[id].bloco === "bolso" && d != null ? -d : d;
-      return swingColor(lado);
+      return swingColor(lado, METRICA_POR_ID[id].escala);
     }
   }
 }
@@ -197,18 +219,22 @@ export function legendaMetrica(id: MetricaId): LegendData {
     case "margem18":
       return marginLegend({ ptLabel: "Haddad", boLabel: "Jair", title: "Vantagem em 2018" });
     case "ptT":
-      return { ...swingLegend({ title: "Lula: 2º turno − 1º turno" }), leftLabel: "Lula caiu", rightLabel: "Lula cresceu" };
+      return {
+        ...swingLegend({ title: "Votos de Lula: 2º vs 1º turno (%)", maxAbs: 30 }),
+        leftLabel: "Lula perdeu votos",
+        rightLabel: "Lula ganhou votos",
+      };
     case "boT":
       return {
-        ...swingLegend({ title: "Flávio: 2º turno − 1º turno" }),
-        leftLabel: "Flávio cresceu",
-        rightLabel: "Flávio caiu",
+        ...swingLegend({ title: "Votos de Flávio: 2º vs 1º turno (%)", maxAbs: 30 }),
+        leftLabel: "Flávio ganhou votos",
+        rightLabel: "Flávio perdeu votos",
       };
     case "margemT":
       return {
-        ...swingLegend({ title: "Δ margem Lula − Flávio (2º − 1º turno)" }),
-        leftLabel: "Flávio herdou mais",
-        rightLabel: "Lula herdou mais",
+        ...swingLegend({ title: "Votos ganhos: Lula − Flávio (% dos válidos do 1º turno)", maxAbs: 10 }),
+        leftLabel: "Flávio ganhou mais",
+        rightLabel: "Lula ganhou mais",
       };
     case "pt22":
       return { ...swingLegend({ title: "Lula 2026 − Lula 2022" }), leftLabel: "Lula caiu", rightLabel: "Lula subiu" };

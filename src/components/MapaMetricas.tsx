@@ -3,7 +3,8 @@
 import { useCallback, useMemo, useState } from "react";
 import { ChoroplethMap } from "@/components/map/ChoroplethMap";
 import { Legend } from "@/components/map/Legend";
-import { fmtPP, fmtPct } from "@/lib/format";
+import { fmtInt, fmtPP, fmtPct } from "@/lib/format";
+import { Crescimento } from "./turnos/ComparacaoTurnos";
 import { BLOCOS } from "@/lib/config";
 import {
   METRICAS,
@@ -26,7 +27,6 @@ export interface DadosMapa extends ValoresLugar {
 export function TooltipMapa({ d, metrica }: { d: DadosMapa | undefined; metrica: MetricaId }) {
   if (!d) return <span className="text-xs">Sem dados</span>;
   const v = valorMetrica(metrica, d);
-  const comT1 = d.pt1 !== undefined || d.bo1 !== undefined;
   const linha = (
     rot: string,
     cor: string,
@@ -34,7 +34,6 @@ export function TooltipMapa({ d, metrica }: { d: DadosMapa | undefined; metrica:
     b: number | null,
     c: number | null,
     nomes: [string, string, string],
-    t1?: number | null,
   ) => (
     <tr>
       <th scope="row" className="pr-2 text-left font-medium" style={{ color: cor }}>
@@ -43,11 +42,7 @@ export function TooltipMapa({ d, metrica }: { d: DadosMapa | undefined; metrica:
       <td className="px-1 text-right" title={nomes[0]}>
         {fmtPct(a, 1)}
       </td>
-      {comT1 && (
-        <td className="px-1 text-right opacity-80" title={`${nomes[0]} no 1º turno de 2026`}>
-          {fmtPct(t1 ?? null, 1)}
-        </td>
-      )}
+
       <td className="px-1 text-right opacity-80" title={nomes[1]}>
         {fmtPct(b, 1)}
       </td>
@@ -68,16 +63,35 @@ export function TooltipMapa({ d, metrica }: { d: DadosMapa | undefined; metrica:
           <tr className="opacity-70">
             <th />
             <th className="px-1 text-right font-normal">2026</th>
-            {comT1 && <th className="px-1 text-right font-normal">1º T</th>}
             <th className="px-1 text-right font-normal">2022</th>
             <th className="px-1 text-right font-normal">2018</th>
           </tr>
         </thead>
         <tbody>
-          {linha("Lula", BLOCOS.pt.cor, d.pt26, d.pt22, d.pt18, ["Lula", "Lula", "Haddad"], d.pt1)}
-          {linha("Flávio", BLOCOS.bolso.cor, d.bo26, d.bo22, d.bo18, ["Flávio", "Jair", "Jair"], d.bo1)}
+          {linha("Lula", BLOCOS.pt.cor, d.pt26, d.pt22, d.pt18, ["Lula", "Lula", "Haddad"])}
+          {linha("Flávio", BLOCOS.bolso.cor, d.bo26, d.bo22, d.bo18, ["Flávio", "Jair", "Jair"])}
         </tbody>
       </table>
+      {d.vt && (
+        <div className="mt-1.5 border-t border-line pt-1.5">
+          <p className="opacity-70">Votos 1º → 2º turno de 2026</p>
+          {(
+            [
+              ["Lula", BLOCOS.pt.cor, d.vt.pt1, d.vt.pt2, d.gpt],
+              ["Flávio", BLOCOS.bolso.cor, d.vt.bo1, d.vt.bo2, d.gbo],
+            ] as const
+          ).map(([nome, cor, a, b, g]) => (
+            <p key={nome} className="flex justify-between gap-3">
+              <span className="font-medium" style={{ color: cor }}>
+                {nome}
+              </span>
+              <span className="tabular-nums">
+                {fmtInt(a)} → {fmtInt(b)} {g != null ? <Crescimento v={g} /> : <span className="opacity-70">(apurando)</span>}
+              </span>
+            </p>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
