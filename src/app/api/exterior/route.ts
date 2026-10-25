@@ -3,7 +3,8 @@
 // seção a seção (antes da totalização das 17h). 404 quando o turno ainda não tem essa fonte.
 import type { NextRequest } from "next/server";
 import { getExterior, statsDaResposta } from "@/lib/exterior/service";
-import { erroResposta, jsonResposta, respostaDeErro } from "@/lib/tse/http";
+import { TURNOS_FINALIZADOS } from "@/lib/config";
+import { CACHE_FINAL, erroResposta, jsonResposta, respostaDeErro } from "@/lib/tse/http";
 import type { Turno } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -39,7 +40,10 @@ export async function GET(request: NextRequest) {
       // um "zero" no CDN — erro sem cache, o cliente (SWR) mantém os dados que já tinha
       return erroResposta(502, "Falha ao consultar o TSE: boletins de urna do exterior indisponíveis no momento.");
     }
-    return jsonResposta(r, st && !st.completo ? CACHE_PARCIAL : CACHE_OK);
+    if (st && !st.completo) return jsonResposta(r, CACHE_PARCIAL);
+    // turno encerrado com todos os boletins recebidos: não muda mais → cache longo
+    const final = TURNOS_FINALIZADOS.includes(turno) && r.total.secoesTotal > 0 && r.total.secoesRecebidas >= r.total.secoesTotal;
+    return jsonResposta(r, final ? CACHE_FINAL : CACHE_OK);
   } catch (e) {
     return respostaDeErro(e);
   }

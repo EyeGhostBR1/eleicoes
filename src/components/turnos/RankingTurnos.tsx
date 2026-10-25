@@ -90,7 +90,9 @@ export default function RankingTurnos({
   carregando,
   minApurado = 0,
   n = 10,
+  titulo = "Quem cresceu e quem caiu",
 }: {
+  titulo?: string;
   linhas: LinhaTurnos[];
   /** "estados", "municípios"... */
   plural: string;
@@ -162,7 +164,7 @@ export default function RankingTurnos({
           />
         }
       >
-        Quem cresceu e quem caiu
+        {titulo}
       </SectionTitle>
 
       {carregando && r.total === 0 ? (

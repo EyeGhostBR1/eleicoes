@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useDeferredValue, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useLiveTurno, useMunicipiosTurno, useParamsState } from "@/lib/client/hooks";
+import { useExteriorTurno, useLiveTurno, useMunicipiosTurno, useParamsState } from "@/lib/client/hooks";
 import { linhaTurnos, valTurnoDeLive, valTurnoDeMun } from "@/lib/turnos";
 import { normalizar } from "@/lib/compare";
 import { UF_POR_SIGLA } from "@/lib/config";
@@ -19,9 +19,10 @@ import TabelaCandidatos from "../TabelaCandidatos";
 import TabelaComparativa, { type LinhaLugar } from "../TabelaComparativa";
 import ComparacaoTurnos from "../turnos/ComparacaoTurnos";
 import RankingTurnos from "../turnos/RankingTurnos";
+import { turnosExterior } from "../turnos/exterior";
 import { candidatosPorNumero, dadosMapaDeLinha, linhaMunicipio } from "../linhas";
 import { Card, ErroCarga, SectionTitle, Skeleton, SkeletonLinhas } from "../ui";
-import { useHistBr, useHistMun, useIndiceMunicipios, useLiveOk, useMunicipiosOk } from "../useDados";
+import { useExteriorOk, useHistBr, useHistMun, useIndiceMunicipios, useLiveOk, useMunicipiosOk } from "../useDados";
 
 export default function EstadoView({ uf }: { uf: string }) {
   const info = UF_POR_SIGLA[uf];
@@ -51,11 +52,23 @@ export default function EstadoView({ uf }: { uf: string }) {
 
   // 2º turno: comparação com o 1º turno de 2026 (resultado final, sem polling)
   const segundo = turno === 2;
-  const liveT1 = useLiveTurno(segundo ? uf : null, null, 1);
+  const liveT1 = useLiveTurno(segundo && !exterior ? uf : null, null, 1);
   const munsT1 = useMunicipiosTurno(segundo && !exterior ? uf : null, 1);
+  // exterior: boletins de urna dos dois turnos (chegam antes da totalização), mesmas cidades
+  const extT2 = useExteriorOk();
+  const extT1 = useExteriorTurno(segundo && exterior ? 1 : null);
+  const te = useMemo(
+    () => turnosExterior(segundo && exterior ? extT1.data : undefined, extT2.data, qs),
+    [segundo, exterior, extT1.data, extT2.data, qs],
+  );
   const turnosUf = useMemo(
-    () => (segundo && liveT1.data ? linhaTurnos({ id: uf, nome: info.nome }, valTurnoDeLive(liveT1.data), valTurnoDeLive(live.data)) : null),
-    [segundo, liveT1.data, live.data, uf, info.nome],
+    () =>
+      exterior
+        ? te.total
+        : segundo && liveT1.data
+          ? linhaTurnos({ id: uf, nome: info.nome }, valTurnoDeLive(liveT1.data), valTurnoDeLive(live.data))
+          : null,
+    [exterior, te.total, segundo, liveT1.data, live.data, uf, info.nome],
   );
   const turnosMuns = useMemo(
     () =>
@@ -121,7 +134,14 @@ export default function EstadoView({ uf }: { uf: string }) {
 
       <ComparacaoBlocos live={live.data} hist={hist} turno={turno} carregando={carregandoLive} />
 
-      {segundo && <ComparacaoTurnos linha={turnosUf} carregando={liveT1.isLoading} nomeLugar={info.nome} />}
+      {segundo && (
+        <ComparacaoTurnos
+          linha={turnosUf}
+          carregando={exterior ? extT1.isLoading : liveT1.isLoading}
+          nomeLugar={info.nome}
+          nota={exterior ? "Exterior: boletins de urna dos dois turnos, somados só nas cidades que já têm boletim no 2º turno (os boletins chegam por fuso horário)." : undefined}
+        />
+      )}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <TabelaCandidatos live={live.data} carregando={carregandoLive} />
@@ -184,6 +204,9 @@ export default function EstadoView({ uf }: { uf: string }) {
             carregando={munsT1.isLoading || muns.isLoading}
             minApurado={30}
           />
+        )}
+        {segundo && exterior && (
+          <RankingTurnos linhas={te.cidades} plural="cidades" carregando={extT1.isLoading || extT2.isLoading} />
         )}
         {segundo && munsT1.error && munsT1.error.status !== 404 && (
           <ErroCarga msg={`1º turno por município: ${munsT1.error.message}`} onRetry={() => void munsT1.mutate()} />

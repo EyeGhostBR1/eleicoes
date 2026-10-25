@@ -1,6 +1,7 @@
 "use client";
 // Card "1º × 2º turno de 2026" de um lugar: % e votos de Lula e Flávio nos dois turnos,
 // variação em p.p. e em votos, comparecimento e saldo (quem herdou mais).
+import type { ReactNode } from "react";
 import { BLOCOS } from "@/lib/config";
 import { deltaPP } from "@/lib/compare";
 import { fmtInt, fmtPct, fmtPP } from "@/lib/format";
@@ -62,10 +63,13 @@ export default function ComparacaoTurnos({
   linha,
   carregando,
   nomeLugar,
+  nota,
 }: {
   linha: LinhaTurnos | null;
   carregando?: boolean;
   nomeLugar: string;
+  /** observação extra abaixo do título (ex.: base de comparação do exterior) */
+  nota?: ReactNode;
 }) {
   const sem2 = !linha?.t2;
   const comp1 = pctComparecimento(linha?.t1 ?? null);
@@ -85,9 +89,10 @@ export default function ComparacaoTurnos({
         <p className="text-sm text-muted">Resultado do 1º turno indisponível no momento.</p>
       ) : (
         <div className="space-y-3">
+          {nota && <p className="text-xs text-muted">{nota}</p>}
           {sem2 && (
             <p className="rounded-md bg-surface-2 px-3 py-2 text-sm text-muted">
-              O 2º turno ainda não começou a ser apurado aqui (o TSE divulga a partir das 17h). Abaixo, o 1º turno.
+              Ainda não há resultados do 2º turno aqui. Abaixo, o 1º turno.
             </p>
           )}
           {resumo && <p className="text-sm text-fg">{resumo}</p>}

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useMemo } from "react";
 import { BLOCOS } from "@/lib/config";
 import { histDe, histPctBloco } from "@/lib/compare";
-import { useParamsState } from "@/lib/client/hooks";
+import { useExteriorTurno, useParamsState } from "@/lib/client/hooks";
 import { fmtInt, fmtPct } from "@/lib/format";
 import type { ExtAgregado, HistByYear, Turno } from "@/lib/types";
 import { Card, SectionTitle, SkeletonLinhas } from "../ui";
@@ -15,6 +15,9 @@ import ComparacaoJusta from "./ComparacaoJusta";
 import { histExteriorInteiro } from "./dados";
 import { CargaExterior, Placar, StatusExterior } from "./partes";
 import TabelaPaises from "./TabelaPaises";
+import ComparacaoTurnos from "../turnos/ComparacaoTurnos";
+import RankingTurnos from "../turnos/RankingTurnos";
+import { turnosExterior } from "../turnos/exterior";
 
 function ReferenciaInteiro({ hist, turno }: { hist: HistByYear; turno: Turno }) {
   const anos = (["2022", "2018"] as const).map((ano) => {
@@ -100,6 +103,11 @@ export default function ExteriorView() {
   const histInteiro = useMemo(() => histExteriorInteiro(histZz.data), [histZz.data]);
   const data = ext.data;
 
+  // 2º turno: comparação com o 1º turno (boletins de urna dos dois turnos, mesmas cidades)
+  const segundo = turno === 2;
+  const ext1 = useExteriorTurno(segundo ? 1 : null);
+  const te = useMemo(() => turnosExterior(segundo ? ext1.data : undefined, data, qs), [segundo, ext1.data, data, qs]);
+
   return (
     <div className="space-y-6">
       <div>
@@ -131,6 +139,25 @@ export default function ExteriorView() {
             <ComparacaoJusta ext={data} histZz={histZz.data} turno={turno} carregandoHist={histZz.isLoading} />
           </div>
           <CandidatosExterior ag={data.total} candidatos={data.candidatos} />
+        </>
+      )}
+
+      {segundo && (
+        <>
+          <ComparacaoTurnos linha={te.total} carregando={ext1.isLoading} nomeLugar="Exterior" nota={"Exterior: boletins de urna dos dois turnos, somados só nas cidades que já têm boletim no 2º turno (os boletins chegam por fuso horário)."} />
+          {ext1.error && <p className="text-sm text-down">1º turno do exterior: {ext1.error.message}</p>}
+          <RankingTurnos
+            titulo="Quem cresceu e quem caiu — por país"
+            linhas={te.paises}
+            plural="países"
+            carregando={ext1.isLoading || ext.isLoading}
+          />
+          <RankingTurnos
+            titulo="Quem cresceu e quem caiu — por cidade"
+            linhas={te.cidades}
+            plural="cidades"
+            carregando={ext1.isLoading || ext.isLoading}
+          />
         </>
       )}
 

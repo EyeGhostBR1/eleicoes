@@ -6,7 +6,7 @@
 //  - votos absolutos: podem cair (mais abstenção, voto em branco/nulo) — mostra perda real.
 // E o saldo relativo: Δ margem (Lula − Flávio) entre os turnos = quem herdou mais.
 import { deltaPP, pct } from "./compare";
-import type { BlocoId, LiveMunRow, LiveResult } from "./types";
+import type { BlocoId, ExtAgregado, LiveMunRow, LiveResult } from "./types";
 
 /** Valores de um lugar num turno. */
 export interface ValTurno {
@@ -50,6 +50,21 @@ export function valTurnoDeMun(row: LiveMunRow | null | undefined): ValTurno | nu
     comp: row.comp,
     ap: row.ap,
     pa: row.pa,
+  };
+}
+
+/** Valores a partir dos boletins de urna do exterior (pa = % das seções com boletim recebido). */
+export function valTurnoDeExt(ag: ExtAgregado | null | undefined): ValTurno | null {
+  if (!ag || !(ag.validos > 0)) return null;
+  return {
+    pt: pct(ag.pt, ag.validos),
+    bo: pct(ag.bo, ag.validos),
+    vpt: ag.pt,
+    vbo: ag.bo,
+    vv: ag.validos,
+    comp: ag.comparecimento,
+    ap: ag.aptos,
+    pa: ag.secoesTotal > 0 ? Math.min(100, (ag.secoesRecebidas / ag.secoesTotal) * 100) : 0,
   };
 }
 

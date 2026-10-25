@@ -149,6 +149,15 @@ export function useMunicipiosTurno(uf: string | null, turno: Turno) {
   );
 }
 
+/** Boletins de urna do exterior de um turno específico. */
+export function useExteriorTurno(turno: Turno | null) {
+  return useSWR<ExteriorResponse, HttpError>(
+    turno ? `/api/exterior?turno=${turno}` : null,
+    fetchJson,
+    optsTurno(turno ?? 2, 60_000),
+  );
+}
+
 export function useHistBr() {
   return useSWR<HistBrFile, HttpError>("/data/hist/br.json", fetchJson, staticOpts);
 }

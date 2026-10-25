@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { useEstadosTurno, useParamsState } from "@/lib/client/hooks";
+import { useEstadosTurno, useExteriorTurno, useParamsState } from "@/lib/client/hooks";
 import { linhaTurnos, valTurnoDeLive } from "@/lib/turnos";
 import { UFS } from "@/lib/config";
 import AvisoParcial from "../AvisoParcial";
@@ -16,6 +16,7 @@ import TabelaCandidatos from "../TabelaCandidatos";
 import TabelaComparativa from "../TabelaComparativa";
 import ComparacaoTurnos from "../turnos/ComparacaoTurnos";
 import RankingTurnos from "../turnos/RankingTurnos";
+import { turnosExterior } from "../turnos/exterior";
 import CardExteriorHome from "../exterior/CardExteriorHome";
 import TeaserEstimativa from "../estimativa/TeaserEstimativa";
 import { dadosMapaDeLinha, linhaBrasil, linhaEstado, linhaExteriorBU } from "../linhas";
@@ -57,18 +58,26 @@ export default function BrasilView() {
       t1ok ? linhaTurnos({ id: "br", nome: "Brasil" }, valTurnoDeLive(t1ok.br), valTurnoDeLive(live.data ?? estados.data?.br)) : null,
     [t1ok, live.data, estados.data],
   );
+  // exterior: boletins de urna dos dois turnos (mesmas cidades), não a totalização
+  const ext1 = useExteriorTurno(segundo ? 1 : null);
+  const teTotal = useMemo(
+    () => (segundo ? turnosExterior(ext1.data, ext.data, qs).total : null),
+    [segundo, ext1.data, ext.data, qs],
+  );
   const turnosUfs = useMemo(
     () =>
       t1ok
         ? UFS.map((u) =>
-            linhaTurnos(
+            u.sigla === "zz" && teTotal
+              ? { ...teTotal, href: `/exterior${qs}` }
+              : linhaTurnos(
               { id: u.sigla, nome: u.nome, sub: u.sigla === "zz" ? undefined : u.sigla.toUpperCase(), href: `/estado/${u.sigla}${qs}` },
               valTurnoDeLive(t1ok.ufs?.[u.sigla]),
               valTurnoDeLive(estados.data?.ufs?.[u.sigla]),
             ),
           )
         : [],
-    [t1ok, estados.data, qs],
+    [t1ok, estados.data, qs, teTotal],
   );
   const temTurnos = segundo && !!t1ok;
 
