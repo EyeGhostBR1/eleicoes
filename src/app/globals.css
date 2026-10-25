@@ -1,0 +1,111 @@
+@import "tailwindcss";
+
+/*
+ * Tokens de cor (claro / escuro). As cores dos blocos seguem BLOCOS em src/lib/config.ts;
+ * no modo escuro usamos variações mais claras para manter o contraste do texto.
+ */
+:root {
+  --bg: #f4f5f7;
+  --surface: #ffffff;
+  --surface-2: #eef0f4;
+  --fg: #0f172a;
+  --muted: #576072;
+  --line: #dfe3ea;
+  --strong: #0f172a;
+  --c-pt: #d62828;
+  --c-bolso: #1d4ed8;
+  --c-outros: #9ca3af;
+  --up: #047857;
+  --down: #c2410c;
+  --ok: #047857;
+  --warn-bg: #fde047;
+  --warn-fg: #3f2a00;
+  --focus: #2563eb;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0b0f17;
+    --surface: #121826;
+    --surface-2: #1b2333;
+    --fg: #e7eaf0;
+    --muted: #9aa4b5;
+    --line: #273146;
+    --strong: #f8fafc;
+    --c-pt: #f87171;
+    --c-bolso: #7ea6ff;
+    --c-outros: #8b93a1;
+    --up: #34d399;
+    --down: #fb923c;
+    --ok: #34d399;
+    --warn-bg: #facc15;
+    --warn-fg: #2b1d00;
+    --focus: #60a5fa;
+    color-scheme: dark;
+  }
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-strong: var(--strong);
+  --color-pt: var(--c-pt);
+  --color-bolso: var(--c-bolso);
+  --color-outros: var(--c-outros);
+  --color-up: var(--up);
+  --color-down: var(--down);
+  --color-ok: var(--ok);
+  --color-warn-bg: var(--warn-bg);
+  --color-warn-fg: var(--warn-fg);
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  /* números alinhados em tabelas e placares */
+  font-variant-numeric: tabular-nums;
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* Tabelas com rolagem horizontal no celular */
+.tabela-scroll {
+  /* relative: contém elementos absolutos (ex.: .sr-only) para não vazarem a rolagem da página */
+  position: relative;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+}
+
+/* Primeira coluna fixa ao rolar a tabela horizontalmente */
+.col-fixa {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--surface);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

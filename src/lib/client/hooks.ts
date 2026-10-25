@@ -1,0 +1,143 @@
+"use client";
+// Hooks de dados do cliente (SWR). Todas as páginas usam estes hooks.
+import useSWR from "swr";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
+import { useCallback, useMemo } from "react";
+import { REFRESH_MS, TURNO_PADRAO } from "../config";
+import type {
+  Ambiente,
+  BoletinsResponse,
+  EstadosResponse,
+  ExteriorResponse,
+  HistBrFile,
+  HistMunFile,
+  LiveResult,
+  MunicipioTuple,
+  MunicipiosResponse,
+  Turno,
+} from "../types";
+
+export class HttpError extends Error {
+  constructor(public status: number, msg: string) {
+    super(msg);
+  }
+}
+
+export async function fetchJson<T>(url: string): Promise<T> {
+  const r = await fetch(url);
+  if (!r.ok) {
+    let msg = `HTTP ${r.status}`;
+    try {
+      const j = await r.json();
+      if (j?.erro) msg = j.erro;
+    } catch {}
+    throw new HttpError(r.status, msg);
+  }
+  return r.json() as Promise<T>;
+}
+
+/** Turno fica na URL (?turno=1|2; sem parâmetro = TURNO_PADRAO). Ambiente sempre OFICIAL do TSE. */
+export function useParamsState() {
+  const sp = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+  const tp = sp.get("turno");
+  const turno: Turno = tp === "1" ? 1 : tp === "2" ? 2 : TURNO_PADRAO;
+  const ambiente: Ambiente = "oficial";
+
+  const set = useCallback(
+    (patch: { turno?: Turno; ambiente?: Ambiente }) => {
+      const p = new URLSearchParams(sp.toString());
+      if (patch.turno) patch.turno === TURNO_PADRAO ? p.delete("turno") : p.set("turno", String(patch.turno));
+      p.delete("amb");
+      const qs = p.toString();
+      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    },
+    [sp, router, pathname],
+  );
+
+  /** Sufixo de query para manter turno/ambiente em links internos. */
+  const qs = useMemo(() => {
+    const p = new URLSearchParams();
+    if (turno !== TURNO_PADRAO) p.set("turno", String(turno));
+    const s = p.toString();
+    return s ? `?${s}` : "";
+  }, [turno]);
+
+  return { turno, ambiente, set, qs };
+}
+
+// O SWR só faz polling por refreshInterval enquanto não há erro guardado. Antes das 17h a API
+// responde 404 ("ainda não divulgado"); sem este onErrorRetry a página pararia de atualizar e
+// nunca mudaria sozinha para os resultados ao vivo.
+const liveOpts = {
+  refreshInterval: REFRESH_MS,
+  revalidateOnFocus: true,
+  keepPreviousData: true,
+  shouldRetryOnError: true,
+  onErrorRetry: (
+    _err: unknown,
+    _key: string,
+    _config: unknown,
+    revalidate: (opts: { retryCount: number }) => void,
+    { retryCount }: { retryCount: number },
+  ) => {
+    setTimeout(() => revalidate({ retryCount }), REFRESH_MS);
+  },
+};
+const staticOpts = { revalidateOnFocus: false, revalidateIfStale: false, revalidateOnReconnect: false };
+
+/** Resultado ao vivo: uf = "br" | sigla; mun = código TSE (opcional). */
+export function useLive(uf: string | null, mun?: string | null) {
+  const { turno, ambiente } = useParamsState();
+  const key = uf
+    ? `/api/tse/resultado?uf=${uf}${mun ? `&mun=${mun}` : ""}&turno=${turno}&amb=${ambiente}`
+    : null;
+  return useSWR<LiveResult, HttpError>(key, fetchJson, liveOpts);
+}
+
+export function useEstados() {
+  const { turno, ambiente } = useParamsState();
+  return useSWR<EstadosResponse, HttpError>(`/api/tse/estados?turno=${turno}&amb=${ambiente}`, fetchJson, liveOpts);
+}
+
+export function useMunicipiosLive(uf: string | null) {
+  const { turno, ambiente } = useParamsState();
+  return useSWR<MunicipiosResponse, HttpError>(
+    uf ? `/api/tse/municipios?uf=${uf}&turno=${turno}&amb=${ambiente}` : null,
+    fetchJson,
+    { ...liveOpts, refreshInterval: 60_000 },
+  );
+}
+
+export function useHistBr() {
+  return useSWR<HistBrFile, HttpError>("/data/hist/br.json", fetchJson, staticOpts);
+}
+
+export function useHistMun(uf: string | null) {
+  return useSWR<HistMunFile, HttpError>(uf ? `/data/hist/mun/${uf}.json` : null, fetchJson, staticOpts);
+}
+
+export function useListaMunicipios() {
+  return useSWR<MunicipioTuple[], HttpError>("/data/municipios.json", fetchJson, staticOpts);
+}
+
+export function useBoletins(q: string, fontes: string[]) {
+  const params = new URLSearchParams();
+  if (q) params.set("q", q);
+  if (fontes.length) params.set("fontes", fontes.join(","));
+  return useSWR<BoletinsResponse, HttpError>(`/api/boletins?${params.toString()}`, fetchJson, {
+    refreshInterval: 60_000,
+    revalidateOnFocus: true,
+    keepPreviousData: true,
+  });
+}
+
+/** Exterior: boletins de urna já recebidos, agregados por cidade e país. */
+export function useExterior() {
+  const { turno } = useParamsState();
+  return useSWR<ExteriorResponse, HttpError>(`/api/exterior?turno=${turno}`, fetchJson, {
+    ...liveOpts,
+    refreshInterval: 60_000,
+  });
+}

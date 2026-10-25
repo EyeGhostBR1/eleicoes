@@ -1,0 +1,36 @@
+{
+  "name": "apuracao-2026",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint"
+  },
+  "dependencies": {
+    "d3-geo": "^3.1.1",
+    "fast-xml-parser": "^5.11.2",
+    "next": "16.3.8",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "swr": "^2.5.1",
+    "topojson-client": "^3.1.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/d3-geo": "^3.1.1",
+    "@types/geojson": "^7946.0.16",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@types/topojson-client": "^3.1.5",
+    "@types/topojson-specification": "^1.0.5",
+    "eslint": "^9",
+    "eslint-config-next": "16.3.8",
+    "mapshaper": "^0.7.72",
+    "tailwindcss": "^4",
+    "tsx": "^4.23.15",
+    "typescript": "^5"
+  }
+}
