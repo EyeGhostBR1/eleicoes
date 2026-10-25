@@ -15,7 +15,7 @@ import StatusApuracao from "../StatusApuracao";
 import TabelaCandidatos from "../TabelaCandidatos";
 import TabelaComparativa from "../TabelaComparativa";
 import ComparacaoTurnos from "../turnos/ComparacaoTurnos";
-import RankingTurnos from "../turnos/RankingTurnos";
+import TabelaTurnos from "../turnos/TabelaTurnos";
 import { turnosExterior } from "../turnos/exterior";
 import CardExteriorHome from "../exterior/CardExteriorHome";
 import TeaserEstimativa from "../estimativa/TeaserEstimativa";
@@ -168,7 +168,14 @@ export default function BrasilView() {
       </section>
 
       {segundo && (
-        <RankingTurnos linhas={turnosUfs} plural="estados" carregando={t1.isLoading || estados.isLoading} />
+        <TabelaTurnos
+          linhas={turnosUfs}
+          rotuloLugar="Estado"
+          plural="estados"
+          rodape={turnosBr}
+          carregando={t1.isLoading || estados.isLoading}
+          pagina={30}
+        />
       )}
 
       <section aria-labelledby="sec-tabela-uf">

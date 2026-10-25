@@ -16,7 +16,7 @@ import { histExteriorInteiro } from "./dados";
 import { CargaExterior, Placar, StatusExterior } from "./partes";
 import TabelaPaises from "./TabelaPaises";
 import ComparacaoTurnos from "../turnos/ComparacaoTurnos";
-import RankingTurnos from "../turnos/RankingTurnos";
+import TabelaTurnos from "../turnos/TabelaTurnos";
 import { turnosExterior } from "../turnos/exterior";
 
 function ReferenciaInteiro({ hist, turno }: { hist: HistByYear; turno: Turno }) {
@@ -146,16 +146,20 @@ export default function ExteriorView() {
         <>
           <ComparacaoTurnos linha={te.total} carregando={ext1.isLoading} nomeLugar="Exterior" nota={"Exterior: boletins de urna dos dois turnos, somados só nas cidades que já têm boletim no 2º turno (os boletins chegam por fuso horário)."} />
           {ext1.error && <p className="text-sm text-down">1º turno do exterior: {ext1.error.message}</p>}
-          <RankingTurnos
-            titulo="Quem cresceu e quem caiu — por país"
+          <TabelaTurnos
+            titulo="1º turno × 2º turno por país"
             linhas={te.paises}
+            rotuloLugar="País"
             plural="países"
+            rodape={te.total}
             carregando={ext1.isLoading || ext.isLoading}
           />
-          <RankingTurnos
-            titulo="Quem cresceu e quem caiu — por cidade"
+          <TabelaTurnos
+            titulo="1º turno × 2º turno por cidade"
             linhas={te.cidades}
+            rotuloLugar="Cidade"
             plural="cidades"
+            rodape={te.total}
             carregando={ext1.isLoading || ext.isLoading}
           />
         </>

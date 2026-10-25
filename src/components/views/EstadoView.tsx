@@ -18,7 +18,7 @@ import StatusApuracao from "../StatusApuracao";
 import TabelaCandidatos from "../TabelaCandidatos";
 import TabelaComparativa, { type LinhaLugar } from "../TabelaComparativa";
 import ComparacaoTurnos from "../turnos/ComparacaoTurnos";
-import RankingTurnos from "../turnos/RankingTurnos";
+import TabelaTurnos from "../turnos/TabelaTurnos";
 import { turnosExterior } from "../turnos/exterior";
 import { candidatosPorNumero, dadosMapaDeLinha, linhaMunicipio } from "../linhas";
 import { valoresTurnos } from "../metricas";
@@ -199,14 +199,22 @@ export default function EstadoView({ uf }: { uf: string }) {
         </div>
 
         {segundo && !exterior && (
-          <RankingTurnos
+          <TabelaTurnos
             linhas={turnosMuns}
+            rotuloLugar={rotuloMun}
             plural={pluralMun}
+            rodape={turnosUf}
             carregando={munsT1.isLoading || muns.isLoading}
           />
         )}
         {segundo && exterior && (
-          <RankingTurnos linhas={te.cidades} plural="cidades" carregando={extT1.isLoading || extT2.isLoading} />
+          <TabelaTurnos
+            linhas={te.cidades}
+            rotuloLugar="Cidade"
+            plural="cidades"
+            rodape={te.total}
+            carregando={extT1.isLoading || extT2.isLoading}
+          />
         )}
         {segundo && munsT1.error && munsT1.error.status !== 404 && (
           <ErroCarga msg={`1º turno por município: ${munsT1.error.message}`} onRetry={() => void munsT1.mutate()} />

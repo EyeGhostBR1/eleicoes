@@ -28,23 +28,35 @@ export function turnosExterior(
     if (recebida(c2) && recebida(c1)) pares.push([c1, c2]);
   }
 
-  const cidades = pares.map(([c1, c2]) =>
-    linhaTurnos(
-      { id: c2.cd, nome: c2.nome, sub: c2.pais, href: `/cidade/zz/${c2.cd}${qs}` },
-      valTurnoDeExt(c1),
-      valTurnoDeExt(c2),
-    ),
-  );
+  // tabela: todas as cidades com votos no 1º turno; 2º turno só onde já há boletim
+  const cidades = Object.values(ext1.cidades)
+    .filter(recebida)
+    .map((c1) => {
+      const c2 = ext2?.cidades?.[c1.cd];
+      return linhaTurnos(
+        { id: c1.cd, nome: c1.nome, sub: c1.pais, href: `/cidade/zz/${c1.cd}${qs}` },
+        valTurnoDeExt(c1),
+        recebida(c2) ? valTurnoDeExt(c2) : null,
+      );
+    });
 
-  const porPais = new Map<string, [ExtCidade[], ExtCidade[]]>();
-  for (const [c1, c2] of pares) {
-    let p = porPais.get(c2.pais);
-    if (!p) porPais.set(c2.pais, (p = [[], []]));
-    p[0].push(c1);
-    p[1].push(c2);
+  // países: com boletins no 2º turno, o 1º turno é somado só nessas mesmas cidades
+  const porPais = new Map<string, { todas: ExtCidade[]; p1: ExtCidade[]; p2: ExtCidade[] }>();
+  for (const c1 of Object.values(ext1.cidades)) {
+    if (!recebida(c1)) continue;
+    let g = porPais.get(c1.pais);
+    if (!g) porPais.set(c1.pais, (g = { todas: [], p1: [], p2: [] }));
+    g.todas.push(c1);
+    const c2 = ext2?.cidades?.[c1.cd];
+    if (recebida(c2)) {
+      g.p1.push(c1);
+      g.p2.push(c2);
+    }
   }
-  const paises = [...porPais].map(([pais, [l1, l2]]) =>
-    linhaTurnos({ id: pais, nome: pais }, valTurnoDeExt(somaAgregados(l1)), valTurnoDeExt(somaAgregados(l2))),
+  const paises = [...porPais].map(([pais, g]) =>
+    g.p2.length
+      ? linhaTurnos({ id: pais, nome: pais }, valTurnoDeExt(somaAgregados(g.p1)), valTurnoDeExt(somaAgregados(g.p2)))
+      : linhaTurnos({ id: pais, nome: pais }, valTurnoDeExt(somaAgregados(g.todas)), null),
   );
 
   // sem boletim do 2º turno ainda: mostra o 1º turno do exterior inteiro
