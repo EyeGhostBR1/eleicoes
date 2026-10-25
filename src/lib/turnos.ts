@@ -6,7 +6,7 @@
 // Votos só são comparáveis com o 2º turno 100% apurado no lugar (`completo`); antes disso o
 // crescimento fica null (a contagem parcial pareceria queda).
 import { deltaPP, pct } from "./compare";
-import type { BlocoId, ExtAgregado, LiveMunRow, LiveResult } from "./types";
+import type { BlocoId, ExtAgregado, HistResult, LiveMunRow, LiveResult } from "./types";
 
 /** Valores de um lugar num turno. */
 export interface ValTurno {
@@ -66,6 +66,12 @@ export function valTurnoDeExt(ag: ExtAgregado | null | undefined): ValTurno | nu
     ap: ag.aptos,
     pa: ag.secoesTotal > 0 ? Math.min(100, (ag.secoesRecebidas / ag.secoesTotal) * 100) : 0,
   };
+}
+
+/** Valores de um resultado final histórico (2022/2018) — sempre 100% apurado. */
+export function valTurnoDeHist(h: HistResult | null | undefined): ValTurno | null {
+  if (!h || !(h.vv > 0)) return null;
+  return { pt: pct(h.pt, h.vv), bo: pct(h.bo, h.vv), vpt: h.pt, vbo: h.bo, vv: h.vv, comp: h.comp, ap: h.ap, pa: 100 };
 }
 
 /** Variação de um bloco entre os turnos. */
