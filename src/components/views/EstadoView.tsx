@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useDeferredValue, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useParamsState } from "@/lib/client/hooks";
+import { useLiveTurno, useMunicipiosTurno, useParamsState } from "@/lib/client/hooks";
+import { linhaTurnos, valTurnoDeLive, valTurnoDeMun } from "@/lib/turnos";
 import { normalizar } from "@/lib/compare";
 import { UF_POR_SIGLA } from "@/lib/config";
 import { fmtInt } from "@/lib/format";
@@ -16,6 +17,8 @@ import ResumoLugares from "../ResumoLugares";
 import StatusApuracao from "../StatusApuracao";
 import TabelaCandidatos from "../TabelaCandidatos";
 import TabelaComparativa, { type LinhaLugar } from "../TabelaComparativa";
+import ComparacaoTurnos from "../turnos/ComparacaoTurnos";
+import RankingTurnos from "../turnos/RankingTurnos";
 import { candidatosPorNumero, dadosMapaDeLinha, linhaMunicipio } from "../linhas";
 import { Card, ErroCarga, SectionTitle, Skeleton, SkeletonLinhas } from "../ui";
 import { useHistBr, useHistMun, useIndiceMunicipios, useLiveOk, useMunicipiosOk } from "../useDados";
@@ -46,15 +49,41 @@ export default function EstadoView({ uf }: { uf: string }) {
   );
   const temLive = linhas.some((l) => l.pt.p2026 != null || l.bo.p2026 != null);
 
+  // 2º turno: comparação com o 1º turno de 2026 (resultado final, sem polling)
+  const segundo = turno === 2;
+  const liveT1 = useLiveTurno(segundo ? uf : null, null, 1);
+  const munsT1 = useMunicipiosTurno(segundo && !exterior ? uf : null, 1);
+  const turnosUf = useMemo(
+    () => (segundo && liveT1.data ? linhaTurnos({ id: uf, nome: info.nome }, valTurnoDeLive(liveT1.data), valTurnoDeLive(live.data)) : null),
+    [segundo, liveT1.data, live.data, uf, info.nome],
+  );
+  const turnosMuns = useMemo(
+    () =>
+      segundo && munsT1.data
+        ? (tuplas ?? []).map((t) =>
+            linhaTurnos(
+              { id: t[0], nome: t[1], href: `/cidade/${uf}/${t[0]}${qs}` },
+              valTurnoDeMun(munsT1.data?.municipios?.[t[0]]),
+              valTurnoDeMun(muns.data?.municipios?.[t[0]]),
+            ),
+          )
+        : [],
+    [segundo, munsT1.data, muns.data, tuplas, uf, qs],
+  );
+  const temTurnos = turnosMuns.length > 0;
+
   // dados do mapa por código IBGE
   const dadosMapa = useMemo(() => {
     const m = new Map<string, DadosMapa>();
     if (!tuplas) return m;
     tuplas.forEach((t, i) => {
-      if (t[3]) m.set(String(t[3]), dadosMapaDeLinha(linhas[i]));
+      if (!t[3]) return;
+      const d = dadosMapaDeLinha(linhas[i]);
+      const lt = turnosMuns[i];
+      m.set(String(t[3]), lt ? { ...d, pt1: lt.pt.p1, bo1: lt.bo.p1 } : d);
     });
     return m;
-  }, [tuplas, linhas]);
+  }, [tuplas, linhas, turnosMuns]);
 
   const [filtro, setFiltro] = useState("");
   const filtroDef = useDeferredValue(filtro);
@@ -91,6 +120,8 @@ export default function EstadoView({ uf }: { uf: string }) {
       </div>
 
       <ComparacaoBlocos live={live.data} hist={hist} turno={turno} carregando={carregandoLive} />
+
+      {segundo && <ComparacaoTurnos linha={turnosUf} carregando={liveT1.isLoading} nomeLugar={info.nome} />}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <TabelaCandidatos live={live.data} carregando={carregandoLive} />
@@ -130,6 +161,7 @@ export default function EstadoView({ uf }: { uf: string }) {
                   idProp="ibge"
                   ariaLabel={`Mapa dos municípios de ${info.nome}`}
                   temLive={temLive}
+                  temTurnos={temTurnos}
                   dados={dadosMapa}
                   onSelect={(ibge) => {
                     const cd = idx.ibgeParaCd.get(ibge);
@@ -144,6 +176,18 @@ export default function EstadoView({ uf }: { uf: string }) {
             {!tuplas ? <SkeletonLinhas n={3} /> : <ResumoLugares linhas={linhas} plural={pluralMun} minApurado={30} />}
           </Card>
         </div>
+
+        {segundo && !exterior && (
+          <RankingTurnos
+            linhas={turnosMuns}
+            plural={pluralMun}
+            carregando={munsT1.isLoading || muns.isLoading}
+            minApurado={30}
+          />
+        )}
+        {segundo && munsT1.error && munsT1.error.status !== 404 && (
+          <ErroCarga msg={`1º turno por município: ${munsT1.error.message}`} onRetry={() => void munsT1.mutate()} />
+        )}
 
         <div className="space-y-2">
           <div className="flex flex-wrap items-center gap-2">

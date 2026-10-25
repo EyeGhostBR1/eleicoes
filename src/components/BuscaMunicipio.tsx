@@ -47,7 +47,16 @@ function filtrar(itens: Item[], q: string, uf: string | null): MunicipioTuple[] 
   return [...comeca, ...palavra, ...contem].slice(0, MAX_SUGESTOES);
 }
 
-export default function BuscaMunicipio({ className }: { className?: string }) {
+export default function BuscaMunicipio({
+  className,
+  onEscolher,
+  placeholder = "Buscar município…",
+}: {
+  className?: string;
+  /** em vez de abrir a página do município, entrega o escolhido (ex.: mapa interativo) */
+  onEscolher?: (t: MunicipioTuple) => void;
+  placeholder?: string;
+}) {
   const { qs } = useParamsState();
   const router = useRouter();
   const lista = useListaMunicipios();
@@ -70,7 +79,8 @@ export default function BuscaMunicipio({ className }: { className?: string }) {
     setAberto(false);
     setTexto("");
     inputRef.current?.blur();
-    router.push(`/cidade/${t[2]}/${t[0]}${qs}`);
+    if (onEscolher) onEscolher(t);
+    else router.push(`/cidade/${t[2]}/${t[0]}${qs}`);
   }
 
   function onKeyDown(e: KeyboardEvent<HTMLInputElement>) {
@@ -129,7 +139,7 @@ export default function BuscaMunicipio({ className }: { className?: string }) {
           aria-activedescendant={mostrar && resultados.length ? optId(idxAtivo) : undefined}
           autoComplete="off"
           spellCheck={false}
-          placeholder="Buscar município…"
+          placeholder={placeholder}
           value={texto}
           onChange={(e) => {
             setTexto(e.target.value);

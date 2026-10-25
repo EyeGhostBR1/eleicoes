@@ -1,8 +1,10 @@
 "use client";
 // Página inicial: Brasil + mapa e tabela por estado.
+import Link from "next/link";
 import { useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { useParamsState } from "@/lib/client/hooks";
+import { useEstadosTurno, useParamsState } from "@/lib/client/hooks";
+import { linhaTurnos, valTurnoDeLive } from "@/lib/turnos";
 import { UFS } from "@/lib/config";
 import AvisoParcial from "../AvisoParcial";
 import ComparacaoBlocos from "../ComparacaoBlocos";
@@ -12,6 +14,8 @@ import ResumoLugares from "../ResumoLugares";
 import StatusApuracao from "../StatusApuracao";
 import TabelaCandidatos from "../TabelaCandidatos";
 import TabelaComparativa from "../TabelaComparativa";
+import ComparacaoTurnos from "../turnos/ComparacaoTurnos";
+import RankingTurnos from "../turnos/RankingTurnos";
 import CardExteriorHome from "../exterior/CardExteriorHome";
 import TeaserEstimativa from "../estimativa/TeaserEstimativa";
 import { dadosMapaDeLinha, linhaBrasil, linhaEstado, linhaExteriorBU } from "../linhas";
@@ -44,10 +48,42 @@ export default function BrasilView() {
       ),
     [linhasTse, estados.data, ext.data, histZz.data, turno, qs, temLive],
   );
-  const dadosMapa = useMemo(
-    () => new Map(linhas.filter((l) => l.id !== "zz").map((l) => [l.id, dadosMapaDeLinha(l)])),
-    [linhas],
+  // 2º turno: comparação com o 1º turno de 2026 (resultado final, sem polling)
+  const segundo = turno === 2;
+  const t1 = useEstadosTurno(segundo ? 1 : null);
+  const t1ok = segundo ? t1.data : undefined;
+  const turnosBr = useMemo(
+    () =>
+      t1ok ? linhaTurnos({ id: "br", nome: "Brasil" }, valTurnoDeLive(t1ok.br), valTurnoDeLive(live.data ?? estados.data?.br)) : null,
+    [t1ok, live.data, estados.data],
   );
+  const turnosUfs = useMemo(
+    () =>
+      t1ok
+        ? UFS.map((u) =>
+            linhaTurnos(
+              { id: u.sigla, nome: u.nome, sub: u.sigla === "zz" ? undefined : u.sigla.toUpperCase(), href: `/estado/${u.sigla}${qs}` },
+              valTurnoDeLive(t1ok.ufs?.[u.sigla]),
+              valTurnoDeLive(estados.data?.ufs?.[u.sigla]),
+            ),
+          )
+        : [],
+    [t1ok, estados.data, qs],
+  );
+  const temTurnos = segundo && !!t1ok;
+
+  const dadosMapa = useMemo(() => {
+    const t1Por = new Map(turnosUfs.map((l) => [l.id, l]));
+    return new Map(
+      linhas
+        .filter((l) => l.id !== "zz")
+        .map((l) => {
+          const d = dadosMapaDeLinha(l);
+          const t = t1Por.get(l.id);
+          return [l.id, t ? { ...d, pt1: t.pt.p1, bo1: t.bo.p1 } : d];
+        }),
+    );
+  }, [linhas, turnosUfs]);
   const rodape = linhaBrasil(live.data ?? estados.data?.br, hist?.br, turno, qs);
 
   return (
@@ -66,6 +102,11 @@ export default function BrasilView() {
 
       <ComparacaoBlocos live={live.data} hist={hist?.br} turno={turno} carregando={carregandoLive} />
 
+      {segundo && (
+        <ComparacaoTurnos linha={turnosBr} carregando={t1.isLoading} nomeLugar="Brasil" />
+      )}
+      {segundo && t1.error && <ErroCarga msg={`1º turno de 2026: ${t1.error.message}`} onRetry={() => void t1.mutate()} />}
+
       <CardExteriorHome />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -76,7 +117,15 @@ export default function BrasilView() {
       {histBr.error && <ErroCarga msg={`Histórico 2022/2018: ${histBr.error.message}`} />}
 
       <section aria-labelledby="sec-mapa-uf">
-        <SectionTitle id="sec-mapa-uf" sub="Clique em um estado para ver os municípios">
+        <SectionTitle
+          id="sec-mapa-uf"
+          sub="Clique em um estado para ver os municípios"
+          right={
+            <Link href={`/mapa${qs}`} className="text-sm font-medium text-strong underline underline-offset-2">
+              Mapa interativo de todos os municípios →
+            </Link>
+          }
+        >
           Mapa por estado
         </SectionTitle>
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
@@ -90,6 +139,7 @@ export default function BrasilView() {
                 idProp="uf"
                 ariaLabel="Mapa do Brasil por estado"
                 temLive={temLive}
+                temTurnos={temTurnos}
                 dados={dadosMapa}
                 onSelect={(id) => router.push(`/estado/${id}${qs}`)}
               />
@@ -106,6 +156,10 @@ export default function BrasilView() {
           </Card>
         </div>
       </section>
+
+      {segundo && (
+        <RankingTurnos linhas={turnosUfs} plural="estados" carregando={t1.isLoading || estados.isLoading} />
+      )}
 
       <section aria-labelledby="sec-tabela-uf">
         <SectionTitle

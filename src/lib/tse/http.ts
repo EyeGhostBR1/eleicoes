@@ -6,6 +6,8 @@ import { UFS_VALIDAS } from "./service";
 export const CACHE_LIVE = "public, s-maxage=15, stale-while-revalidate=30";
 export const CACHE_MUNICIPIOS = "public, s-maxage=45, stale-while-revalidate=90";
 export const CACHE_ERRO = "no-store";
+/** Turno já totalizado por completo (ex.: 1º turno de 2026): não muda mais → cache longo no CDN. */
+export const CACHE_FINAL = "public, s-maxage=1800, stale-while-revalidate=86400";
 /**
  * 404 "ainda não divulgado" é um estado esperado (o dia todo até ~17h, e o 2º turno até 25/10):
  * cache curto no CDN para não invocar a função a cada poll de cada cliente. Erros de verdade

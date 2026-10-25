@@ -3,7 +3,7 @@
 import useSWR from "swr";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { useCallback, useMemo } from "react";
-import { REFRESH_MS, TURNO_PADRAO } from "../config";
+import { REFRESH_MS, TURNOS_FINALIZADOS, TURNO_PADRAO } from "../config";
 import type {
   Ambiente,
   BoletinsResponse,
@@ -107,6 +107,45 @@ export function useMunicipiosLive(uf: string | null) {
     uf ? `/api/tse/municipios?uf=${uf}&turno=${turno}&amb=${ambiente}` : null,
     fetchJson,
     { ...liveOpts, refreshInterval: 60_000 },
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Turno explícito (independente da URL) — comparação 1º × 2º turno de 2026.
+// Mesmo formato de chave dos hooks acima → o SWR reaproveita/deduplica quando o turno coincide.
+// Turno já finalizado: sem polling (o resultado não muda mais), mas com novas tentativas em erro.
+// ---------------------------------------------------------------------------
+const finalOpts = {
+  ...liveOpts,
+  refreshInterval: 0,
+  revalidateOnFocus: false,
+  revalidateIfStale: false,
+};
+function optsTurno(turno: Turno, refreshMs: number = REFRESH_MS) {
+  return TURNOS_FINALIZADOS.includes(turno) ? finalOpts : { ...liveOpts, refreshInterval: refreshMs };
+}
+
+/** Resultado (Brasil / UF / município) de um turno específico. */
+export function useLiveTurno(uf: string | null, mun: string | null | undefined, turno: Turno) {
+  const key = uf ? `/api/tse/resultado?uf=${uf}${mun ? `&mun=${mun}` : ""}&turno=${turno}&amb=oficial` : null;
+  return useSWR<LiveResult, HttpError>(key, fetchJson, optsTurno(turno));
+}
+
+/** Brasil + todas as UFs de um turno específico. */
+export function useEstadosTurno(turno: Turno | null) {
+  return useSWR<EstadosResponse, HttpError>(
+    turno ? `/api/tse/estados?turno=${turno}&amb=oficial` : null,
+    fetchJson,
+    optsTurno(turno ?? 2),
+  );
+}
+
+/** Linhas por município de uma UF num turno específico. */
+export function useMunicipiosTurno(uf: string | null, turno: Turno) {
+  return useSWR<MunicipiosResponse, HttpError>(
+    uf ? `/api/tse/municipios?uf=${uf}&turno=${turno}&amb=oficial` : null,
+    fetchJson,
+    optsTurno(turno, 60_000),
   );
 }
 

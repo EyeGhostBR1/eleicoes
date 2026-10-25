@@ -1,10 +1,11 @@
 "use client";
 // Página de município: resultado ao vivo vs 2022/2018 + comparação com o estado.
 import Link from "next/link";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { BLOCOS, UF_POR_SIGLA } from "@/lib/config";
 import { compararLive } from "@/lib/compare";
-import { useParamsState } from "@/lib/client/hooks";
+import { useLiveTurno, useParamsState } from "@/lib/client/hooks";
+import { linhaTurnos, valTurnoDeLive } from "@/lib/turnos";
 import { fmtPct } from "@/lib/format";
 import type { HistByYear, LiveResult, Turno } from "@/lib/types";
 import AvisoParcial from "../AvisoParcial";
@@ -13,6 +14,7 @@ import ComparacaoParticipacao from "../ComparacaoParticipacao";
 import CardCidadeExterior from "../exterior/CardCidadeExterior";
 import StatusApuracao from "../StatusApuracao";
 import TabelaCandidatos from "../TabelaCandidatos";
+import ComparacaoTurnos from "../turnos/ComparacaoTurnos";
 import { Card, DeltaPP, SectionTitle, Skeleton } from "../ui";
 import { useHistBr, useHistMun, useIndiceMunicipios, useLiveOk } from "../useDados";
 
@@ -69,6 +71,17 @@ export default function CidadeView({ uf, cd }: { uf: string; cd: string }) {
   const siglaUf = uf === "zz" ? "Exterior" : uf.toUpperCase();
   const nomeMun = t?.[1];
 
+  // 2º turno: comparação com o 1º turno de 2026
+  const segundo = turno === 2;
+  const liveT1 = useLiveTurno(segundo && !naoEncontrado ? uf : null, cd, 1);
+  const turnos = useMemo(
+    () =>
+      segundo && liveT1.data
+        ? linhaTurnos({ id: cd, nome: nomeMun ?? cd }, valTurnoDeLive(liveT1.data), valTurnoDeLive(live.data))
+        : null,
+    [segundo, liveT1.data, live.data, cd, nomeMun],
+  );
+
   // o nome do município só é conhecido no cliente (lista em /data/municipios.json)
   useEffect(() => {
     if (nomeMun) document.title = `${nomeMun} (${siglaUf}) · Apuração 2026`;
@@ -124,6 +137,8 @@ export default function CidadeView({ uf, cd }: { uf: string; cd: string }) {
       </div>
 
       <ComparacaoBlocos live={live.data} hist={hist} turno={turno} carregando={carregandoLive} />
+
+      {segundo && <ComparacaoTurnos linha={turnos} carregando={liveT1.isLoading} nomeLugar={nomeMun ?? "Município"} />}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <TabelaCandidatos live={live.data} carregando={carregandoLive} />

@@ -32,6 +32,7 @@ export {
   jsonResposta,
   erroResposta,
   respostaDeErro,
+  CACHE_FINAL,
   CACHE_LIVE,
   CACHE_MUNICIPIOS,
   CACHE_NAO_DIVULGADO,

@@ -106,3 +106,9 @@ export const REFRESH_MS = 30_000;
  * o 1º turno continua acessível pelo seletor (?turno=1).
  */
 export const TURNO_PADRAO: Turno = 2;
+
+/**
+ * Turnos de 2026 já totalizados por completo (o 1º turno, em 04/10/2026). Usado para cache longo
+ * e para não fazer polling desses dados na comparação 1º × 2º turno.
+ */
+export const TURNOS_FINALIZADOS: Turno[] = [1];

@@ -74,6 +74,7 @@ export default function Header() {
 
         <nav aria-label="Principal" className="flex flex-wrap items-center gap-1">
           {navLink("/", "Brasil", pathname === "/")}
+          {navLink("/mapa", "Mapa", pathname.startsWith("/mapa"))}
           {navLink("/estimativa", "Estimativa", pathname.startsWith("/estimativa"))}
           <label className="sr-only" htmlFor="sel-estado">
             Estados

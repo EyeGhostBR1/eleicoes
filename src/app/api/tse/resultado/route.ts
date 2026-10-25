@@ -2,6 +2,7 @@
 // → LiveResult. 404 quando o TSE ainda não divulgou dados para a abrangência.
 import type { NextRequest } from "next/server";
 import {
+  CACHE_FINAL,
   CACHE_LIVE,
   CACHE_NAO_DIVULGADO,
   erroResposta,
@@ -25,7 +26,7 @@ export async function GET(request: NextRequest) {
       { incluirVazio: p.vazio },
     );
     if (!r) return erroResposta(404, MSG_NAO_DIVULGADO, CACHE_NAO_DIVULGADO);
-    return jsonResposta(r, CACHE_LIVE);
+    return jsonResposta(r, r.finalizado ? CACHE_FINAL : CACHE_LIVE);
   } catch (e) {
     return respostaDeErro(e);
   }
