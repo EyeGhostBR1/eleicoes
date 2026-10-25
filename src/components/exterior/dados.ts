@@ -122,40 +122,6 @@ export function somaHist(
   return out;
 }
 
-/** Lula/Flávio no 1º turno de 2026 (% dos válidos) — referência na página do 2º turno. */
-export interface RefT1Ext {
-  pt: number | null;
-  bo: number | null;
-  /** comparecimento (% dos aptos) */
-  comp: number | null;
-}
-
-/**
- * 1º turno de 2026 (boletins de urna) somado nas cidades dadas, cada uma com um peso (fração das
- * seções já recebidas no 2º turno, como em 2022/2018). Só percentuais; null sem votos.
- */
-export function t1Ponderado(
-  itens: Iterable<readonly [string, number]>,
-  ext1: ExteriorResponse | null | undefined,
-): RefT1Ext | null {
-  if (!ext1) return null;
-  let vv = 0;
-  let pt = 0;
-  let bo = 0;
-  let comp = 0;
-  let ap = 0;
-  for (const [cd, w] of itens) {
-    const c = ext1.cidades?.[cd];
-    if (!c || !(w > 0) || !(c.validos > 0)) continue;
-    vv += c.validos * w;
-    pt += c.pt * w;
-    bo += c.bo * w;
-    comp += c.comparecimento * w;
-    ap += c.aptos * w;
-  }
-  return vv > 0 ? { pt: pct(pt, vv), bo: pct(bo, vv), comp: pct(comp, ap) } : null;
-}
-
 /** Peso de uma cidade no parcial de 2026: fração das seções já recebidas (0–1). */
 export function pesoRecebido(c: Pick<ExtAgregado, "secoesTotal" | "secoesRecebidas"> | null | undefined): number {
   if (!c || !(c.secoesRecebidas > 0)) return 0;
@@ -228,8 +194,6 @@ export interface LinhaExt {
   baseParcial?: { n: number; de: number } | null;
   /** sem histórico de 2022/2018 (cidade nova) */
   semHist?: boolean;
-  /** 1º turno de 2026 na mesma base (só na página do 2º turno) */
-  t1?: RefT1Ext | null;
 }
 
 export function linhaDe(p: {
@@ -294,7 +258,6 @@ export function linhasPaises(
   turno: Turno,
   base: BaseHist,
   histPais?: Record<string, HistByYear>,
-  ext1?: ExteriorResponse,
 ): LinhaExt[] {
   const hp = histPais ?? histPorPais(histZz);
   const nomes = new Set<string>([...listaPaises(), ...Object.keys(ext?.paises ?? {})]);
@@ -309,8 +272,6 @@ export function linhasPaises(
     }
     let hist: HistByYear | undefined = hp[pais];
     let baseParcial: { n: number; de: number } | null = null;
-    // 1º turno de 2026: mesma base de 2022/2018 (país inteiro ou só as cidades com boletins)
-    let pesosT1: (readonly [string, number])[] = cds.map((cd) => [cd, 1] as const);
     if (base === "mesmas" && ext && (ag?.secoesRecebidas ?? 0) > 0) {
       const pesos = cds.map((cd) => [cd, pesoRecebido(ext.cidades?.[cd])] as const);
       const com = pesos.filter(([, w]) => w > 0);
@@ -318,12 +279,10 @@ export function linhasPaises(
       if (com.length > 0 && pesos.some(([, w]) => w < 1)) {
         hist = somaHist(com, histZz);
         baseParcial = { n: com.length, de: cds.length };
-        pesosT1 = com;
       }
     }
-    const t1 = ext1 ? t1Ponderado(pesosT1, ext1) : undefined;
-    out.push({
-      ...linhaDe({
+    out.push(
+      linhaDe({
         id: pais,
         tipo: "pais",
         nome: pais,
@@ -335,8 +294,7 @@ export function linhasPaises(
         cidades: cds,
         baseParcial,
       }),
-      t1,
-    });
+    );
   }
   return out;
 }
@@ -349,12 +307,10 @@ export function linhasCidades(
   turno: Turno,
   nomeFallback: (cd: string) => string | undefined,
   qs: string,
-  ext1?: ExteriorResponse,
 ): LinhaExt[] {
   return cds.map((cd) => {
     const c = ext?.cidades?.[cd];
-    const t1 = ext1 ? t1Ponderado([[cd, 1]], ext1) : undefined;
-    const l = linhaDe({
+    return linhaDe({
       id: cd,
       tipo: "cidade",
       nome: c?.nome || nomeFallback(cd) || cd,
@@ -364,7 +320,6 @@ export function linhasCidades(
       turno,
       candidatos: ext?.candidatos,
     });
-    return t1 === undefined ? l : { ...l, t1 };
   });
 }
 

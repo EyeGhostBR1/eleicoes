@@ -109,13 +109,7 @@ export default function BrasilView() {
         <TeaserEstimativa />
       </div>
 
-      <ComparacaoBlocos
-        live={live.data}
-        hist={hist?.br}
-        turno={turno}
-        carregando={carregandoLive}
-        t1={turnosBr?.t1 ? { pt: turnosBr.pt.p1, bo: turnosBr.bo.p1 } : null}
-      />
+      <ComparacaoBlocos live={live.data} hist={hist?.br} turno={turno} carregando={carregandoLive} />
 
       {segundo && (
         <ComparacaoTurnos linha={turnosBr} carregando={t1.isLoading} nomeLugar="Brasil" />
