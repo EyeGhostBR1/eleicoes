@@ -105,7 +105,7 @@ function carregarMuns(anoVivo: AnoHist, turno: Turno): Mun[] {
 // ---------------------------------------------------------------------------
 // Ordens de apuração (agenda: início s_m e duração d_m; f_m(t) = clamp((t − s_m)/d_m))
 // ---------------------------------------------------------------------------
-const ORDENS = ["regiao", "pequenos", "grandes", "aleatoria", "gradual", "vies"] as const;
+const ORDENS = ["regiao", "pequenos", "grandes", "aleatoria", "gradual", "vies", "nordeste"] as const;
 type Ordem = (typeof ORDENS)[number];
 const ORDENS_MARGEM: Ordem[] = ["regiao", "pequenos", "grandes", "aleatoria", "gradual"];
 const NOME_ORDEM: Record<Ordem, string> = {
@@ -115,6 +115,7 @@ const NOME_ORDEM: Record<Ordem, string> = {
   aleatoria: "(d) aleatória uniforme",
   gradual: "(e) progresso intramunicipal gradual (todos parciais)",
   vies: "(f) ESTRESSE: (a) + viés intramunicipal nas seções apuradas",
+  nordeste: "(g) por região INVERTIDA (N/NE rápidos, S/SE/CO lentos, exterior por último) — fora das margens",
 };
 
 interface Agenda {
@@ -123,6 +124,16 @@ interface Agenda {
   /** viés intramunicipal na fatia PT do apurado (Bolsonaro recebe −δ) */
   delta: Float64Array | null;
 }
+
+/** Ordem (g): Norte/Nordeste apuram primeiro (cenário do 2º turno de 2026, votação até 19h). */
+const REG_BASE_INV: Record<string, number> = {
+  Norte: 0,
+  Nordeste: 0.02,
+  "Centro-Oeste": 0.12,
+  Sudeste: 0.15,
+  Sul: 0.2,
+  Exterior: 0.5,
+};
 
 const REG_BASE: Record<string, number> = {
   Sul: 0,
@@ -149,12 +160,14 @@ function agenda(ordem: Ordem, muns: Mun[], rng: Rng): Agenda {
     const m = muns[i];
     switch (ordem) {
       case "regiao":
-      case "vies": {
+      case "vies":
+      case "nordeste": {
+        const rb = ordem === "nordeste" ? REG_BASE_INV : REG_BASE;
         if (m.uf === "zz") {
-          s[i] = REG_BASE.Exterior * regFat + unif(rng, 0, 0.4);
+          s[i] = rb.Exterior * regFat + unif(rng, 0, 0.4);
           d[i] = unif(rng, 0.02, 0.08);
         } else {
-          s[i] = Math.max(0, (REG_BASE[m.regiao] ?? 0.1) * regFat + ufOff[m.uf] + unif(rng, 0, 0.2));
+          s[i] = Math.max(0, (rb[m.regiao] ?? 0.1) * regFat + ufOff[m.uf] + unif(rng, 0, 0.2));
           d[i] = (0.04 + 0.1 * m.L) * unif(rng, 0.7, 1.3);
         }
         break;
@@ -577,6 +590,23 @@ md.push("```ts");
 md.push(ts);
 md.push("```");
 
+md.push("");
+md.push("## Ordem (g): Norte/Nordeste primeiro × ordem (a): Sul/Sudeste primeiro");
+md.push("");
+for (const dir of ["2022←2018", "2018←2022"]) {
+  for (const turno of [1, 2] as Turno[]) {
+    for (const o of ["regiao", "nordeste"] as Ordem[]) {
+      const rs = todos.filter((r) => r.dir === dir && r.turno === turno && r.ordem === o);
+      if (!rs.length) continue;
+      md.push(`### ${dir} · ${turno}º turno · ordem \`${o}\``);
+      md.push("");
+      md.push(tabelaErros(rs));
+      md.push("");
+      md.push(tabelaChamadas(rs, turno));
+      md.push("");
+    }
+  }
+}
 writeFileSync(OUT, md.join("\n"), "utf8");
 console.log("");
 console.log(md.join("\n"));
