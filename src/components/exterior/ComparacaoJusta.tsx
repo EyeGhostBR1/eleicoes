@@ -3,11 +3,11 @@
 // apenas as MESMAS cidades — as que já têm boletins em 2026.
 import { useMemo, useState } from "react";
 import { BLOCOS } from "@/lib/config";
-import { margem } from "@/lib/compare";
+import { deltaPP, margem } from "@/lib/compare";
 import { fmtInt, fmtPP, fmtPct } from "@/lib/format";
 import type { BlocoId, ExteriorResponse, HistMunFile, Turno } from "@/lib/types";
 import { Card, DeltaPP, Segmentado, SectionTitle, cx } from "../ui";
-import { type ConjuntoComparacao, type Criterio, conjuntoComparacao } from "./dados";
+import { type ConjuntoComparacao, type Criterio, type RefT1Ext, conjuntoComparacao, pesoRecebido, t1Ponderado } from "./dados";
 
 type Ano = "2026" | "2022" | "2018";
 
@@ -26,11 +26,24 @@ function TextoMargem({ m, ano }: { m: number | null; ano: Ano }) {
   );
 }
 
-function Tabela({ c }: { c: ConjuntoComparacao }) {
-  const linhas: { ano: Ano; rotulo: string; pt: number | null; bo: number | null; dpt: number | null; dbo: number | null }[] = [
-    { ano: "2026", rotulo: "2026 (boletins)", pt: c.pt.p2026, bo: c.bo.p2026, dpt: null, dbo: null },
-    { ano: "2022", rotulo: "2022 (final)", pt: c.pt.p2022, bo: c.bo.p2022, dpt: c.pt.d22, dbo: c.bo.d22 },
-    { ano: "2018", rotulo: "2018 (final)", pt: c.pt.p2018, bo: c.bo.p2018, dpt: c.pt.d18, dbo: c.bo.d18 },
+function Tabela({ c, t1 }: { c: ConjuntoComparacao; t1?: RefT1Ext | null }) {
+  const linhas: { id: string; ano: Ano; rotulo: string; pt: number | null; bo: number | null; dpt: number | null; dbo: number | null }[] = [
+    { id: "2026", ano: "2026", rotulo: t1 !== undefined ? "2026 · 2º turno (boletins)" : "2026 (boletins)", pt: c.pt.p2026, bo: c.bo.p2026, dpt: null, dbo: null },
+    ...(t1 !== undefined
+      ? [
+          {
+            id: "t1",
+            ano: "2026" as const,
+            rotulo: "2026 · 1º turno (final)",
+            pt: t1?.pt ?? null,
+            bo: t1?.bo ?? null,
+            dpt: deltaPP(c.pt.p2026, t1?.pt),
+            dbo: deltaPP(c.bo.p2026, t1?.bo),
+          },
+        ]
+      : []),
+    { id: "2022", ano: "2022", rotulo: "2022 (final)", pt: c.pt.p2022, bo: c.bo.p2022, dpt: c.pt.d22, dbo: c.bo.d22 },
+    { id: "2018", ano: "2018", rotulo: "2018 (final)", pt: c.pt.p2018, bo: c.bo.p2018, dpt: c.pt.d18, dbo: c.bo.d18 },
   ];
   return (
     <div className="tabela-scroll -mx-1">
@@ -56,7 +69,7 @@ function Tabela({ c }: { c: ConjuntoComparacao }) {
         </thead>
         <tbody className="divide-y divide-line">
           {linhas.map((l) => (
-            <tr key={l.ano} className={cx(l.ano === "2026" && "font-semibold")}>
+            <tr key={l.id} className={cx(l.id === "2026" && "font-semibold")}>
               <th scope="row" className="whitespace-nowrap px-1 py-2 text-left font-medium text-fg">
                 {l.rotulo}
               </th>
@@ -64,8 +77,8 @@ function Tabela({ c }: { c: ConjuntoComparacao }) {
                 <span className="font-semibold" style={{ color: "var(--c-pt)" }} title={`${nomeCurto("pt", l.ano)} ${l.ano}`}>
                   {fmtPct(l.pt, 1)}
                 </span>
-                {l.ano !== "2026" && (
-                  <span className="ml-1.5 text-xs" title={`Lula 2026 − ${nomeCurto("pt", l.ano)} ${l.ano}`}>
+                {l.id !== "2026" && (
+                  <span className="ml-1.5 text-xs" title={`Lula 2026 − ${nomeCurto("pt", l.ano)} ${l.rotulo}`}>
                     <DeltaPP v={l.dpt} semSufixo />
                   </span>
                 )}
@@ -74,8 +87,8 @@ function Tabela({ c }: { c: ConjuntoComparacao }) {
                 <span className="font-semibold" style={{ color: "var(--c-bolso)" }} title={`${nomeCurto("bolso", l.ano)} ${l.ano}`}>
                   {fmtPct(l.bo, 1)}
                 </span>
-                {l.ano !== "2026" && (
-                  <span className="ml-1.5 text-xs" title={`Flávio 2026 − Jair ${l.ano}`}>
+                {l.id !== "2026" && (
+                  <span className="ml-1.5 text-xs" title={`Flávio 2026 − ${nomeCurto("bolso", l.ano)} ${l.rotulo}`}>
                     <DeltaPP v={l.dbo} semSufixo />
                   </span>
                 )}
@@ -90,7 +103,13 @@ function Tabela({ c }: { c: ConjuntoComparacao }) {
               Comparecimento
             </th>
             <td colSpan={3} className="px-1 py-2 text-right text-xs text-muted">
-              2026 <span className="font-medium text-fg">{fmtPct(c.comp26, 1)}</span> · 2022{" "}
+              2026 <span className="font-medium text-fg">{fmtPct(c.comp26, 1)}</span>
+              {t1 && (
+                <>
+                  {" "}· 1º turno <span className="font-medium text-fg">{fmtPct(t1.comp, 1)}</span>
+                </>
+              )}{" "}
+              · 2022{" "}
               <span className="font-medium text-fg">{fmtPct(c.comp22, 1)}</span> · 2018{" "}
               <span className="font-medium text-fg">{fmtPct(c.comp18, 1)}</span>
             </td>
@@ -120,7 +139,10 @@ export default function ComparacaoJusta({
   histZz,
   turno,
   carregandoHist,
+  ext1,
 }: {
+  /** 2º turno: boletins do 1º turno de 2026 (linha de referência nas mesmas cidades) */
+  ext1?: ExteriorResponse;
   ext: ExteriorResponse;
   histZz: HistMunFile | undefined;
   turno: Turno;
@@ -132,12 +154,17 @@ export default function ComparacaoJusta({
   // padrão: cidades completas, se já houver alguma com votos
   const criterio: Criterio = escolha ?? ((completas?.ag.validos ?? 0) > 0 ? "completas" : "recebidas");
   const c = criterio === "completas" ? completas : recebidas;
+  // 1º turno de 2026 nas mesmas cidades, com o mesmo peso usado em 2022/2018
+  const t1 = useMemo(
+    () => (ext1 && c ? t1Ponderado(c.cidades.map((cd) => [cd, pesoRecebido(ext.cidades[cd])] as const), ext1) : undefined),
+    [ext1, c, ext],
+  );
 
   return (
     <Card className="p-4 sm:p-5" aria-labelledby="comp-justa">
       <SectionTitle
         id="comp-justa"
-        sub="2022 e 2018 somados só nas cidades que já têm boletins em 2026 — a comparação que importa durante o recebimento."
+        sub={`${ext1 ? "1º turno de 2026, 2022 e 2018" : "2022 e 2018"} somados só nas cidades que já têm boletins em 2026 — a comparação que importa durante o recebimento.`}
       >
         Comparação nas mesmas cidades
       </SectionTitle>
@@ -171,7 +198,7 @@ export default function ComparacaoJusta({
         </p>
       ) : (
         <>
-          <Tabela c={c} />
+          <Tabela c={c} t1={t1} />
           <p className="mt-2 text-xs text-muted">
             {fmtInt(c.cidades.length)} {c.cidades.length === 1 ? "cidade" : "cidades"} em {fmtInt(c.paises)}{" "}
             {c.paises === 1 ? "país" : "países"} · {fmtInt(c.ag.secoesRecebidas)} seções · {fmtInt(c.ag.validos)} votos

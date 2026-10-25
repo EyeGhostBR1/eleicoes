@@ -4,7 +4,7 @@
 import Link from "next/link";
 import { Fragment, type ReactNode, useDeferredValue, useMemo, useState } from "react";
 import { BLOCOS } from "@/lib/config";
-import { normalizar } from "@/lib/compare";
+import { deltaPP, normalizar } from "@/lib/compare";
 import { histPorPais } from "@/lib/exterior/paises";
 import { fmtInt, fmtPct } from "@/lib/format";
 import type { BlocoId, ExteriorResponse, HistMunFile, Turno } from "@/lib/types";
@@ -84,6 +84,37 @@ const COLUNAS: Coluna[] = [
   },
 ];
 
+/** Colunas "1º turno de 2026" (só na página do 2º turno), logo após a coluna 2026 de cada bloco. */
+const COLUNAS_T1: Record<BlocoId, Coluna[]> = {
+  pt: [
+    { id: "pt1", grupo: "pt", rotulo: "1º T", titulo: "Lula no 1º turno de 2026 (mesma base)", get: (l) => l.t1?.pt ?? null, render: (l) => pctHist(l.t1?.pt ?? null) },
+    {
+      id: "dpt1",
+      grupo: "pt",
+      rotulo: "Δ 1º",
+      titulo: "Lula 2º turno − Lula 1º turno (p.p.)",
+      get: (l) => deltaPP(l.pt.p2026, l.t1?.pt),
+      render: (l) => <DeltaPP v={deltaPP(l.pt.p2026, l.t1?.pt)} semSufixo />,
+    },
+  ],
+  bolso: [
+    { id: "bo1", grupo: "bolso", rotulo: "1º T", titulo: "Flávio no 1º turno de 2026 (mesma base)", get: (l) => l.t1?.bo ?? null, render: (l) => pctHist(l.t1?.bo ?? null) },
+    {
+      id: "dbo1",
+      grupo: "bolso",
+      rotulo: "Δ 1º",
+      titulo: "Flávio 2º turno − Flávio 1º turno (p.p.)",
+      get: (l) => deltaPP(l.bo.p2026, l.t1?.bo),
+      render: (l) => <DeltaPP v={deltaPP(l.bo.p2026, l.t1?.bo)} semSufixo />,
+    },
+  ],
+};
+
+function colunasPara(comT1: boolean): Coluna[] {
+  if (!comT1) return COLUNAS;
+  return COLUNAS.flatMap((c) => (c.id === "pt26" ? [c, ...COLUNAS_T1.pt] : c.id === "bo26" ? [c, ...COLUNAS_T1.bolso] : [c]));
+}
+
 const GRUPOS: Record<BlocoId, { rotulo: string; cor: string }> = {
   pt: { rotulo: "Lula / Haddad", cor: BLOCOS.pt.cor },
   bolso: { rotulo: "Flávio / Jair", cor: BLOCOS.bolso.cor },
@@ -103,7 +134,10 @@ export default function TabelaPaises({
   turno,
   qs,
   nomeCidade,
+  ext1,
 }: {
+  /** 2º turno: boletins do 1º turno de 2026, para as colunas de comparação */
+  ext1?: ExteriorResponse;
   ext: ExteriorResponse | undefined;
   histZz: HistMunFile | undefined;
   turno: Turno;
@@ -119,12 +153,16 @@ export default function TabelaPaises({
   const filtroDef = useDeferredValue(filtro);
 
   const histPais = useMemo(() => histPorPais(histZz), [histZz]);
-  const linhas = useMemo(() => linhasPaises(ext, histZz, turno, base, histPais), [ext, histZz, turno, base, histPais]);
+  const linhas = useMemo(
+    () => linhasPaises(ext, histZz, turno, base, histPais, ext1),
+    [ext, histZz, turno, base, histPais, ext1],
+  );
+  const colunas = useMemo(() => colunasPara(!!ext1), [ext1]);
 
   const get = useMemo(() => {
     if (ordem.col === "nome") return (l: LinhaExt) => l.nome;
-    return COLUNAS.find((c) => c.id === ordem.col)?.get ?? ((l: LinhaExt) => l.nome);
-  }, [ordem.col]);
+    return colunas.find((c) => c.id === ordem.col)?.get ?? ((l: LinhaExt) => l.nome);
+  }, [ordem.col, colunas]);
   const ordenar = useMemo(
     () => (arr: LinhaExt[]) =>
       arr.slice().sort((a, b) => compararValor(get(a), get(b), ordem.dir) || a.nome.localeCompare(b.nome, "pt-BR")),
@@ -178,7 +216,7 @@ export default function TabelaPaises({
   }
 
   const celulas = (l: LinhaExt) =>
-    COLUNAS.map((c) => (
+    colunas.map((c) => (
       <td key={c.id} className={cx("whitespace-nowrap px-2 py-1.5 text-right", c.sep && "border-l border-line")}>
         {c.render(l)}
       </td>
@@ -229,7 +267,7 @@ export default function TabelaPaises({
 
   function linhasDasCidades(l: LinhaExt) {
     if (!abertos.has(l.id) || !l.cidades?.length) return null;
-    const cids = ordenar(linhasCidades(l.cidades, ext, histZz, turno, nomeCidade, qs));
+    const cids = ordenar(linhasCidades(l.cidades, ext, histZz, turno, nomeCidade, qs, ext1));
     const idCidades = `cid-${l.id.replace(/\W+/g, "-")}`;
     return cids.map((c, i) => (
       <tr
@@ -303,7 +341,7 @@ export default function TabelaPaises({
                 <th
                   key={g}
                   scope="colgroup"
-                  colSpan={5}
+                  colSpan={ext1 ? 7 : 5}
                   className="border-b-2 border-l border-l-line px-2 pt-2 text-center text-xs font-semibold"
                   style={{ borderBottomColor: GRUPOS[g].cor, color: corTxt(g) }}
                 >
@@ -314,7 +352,7 @@ export default function TabelaPaises({
             </tr>
             <tr className="border-b border-line">
               {th("nome", "País", "Nome do país", "asc", "col-fixa")}
-              {COLUNAS.map((c) => th(c.id, c.rotulo, c.titulo, c.dir0, c.sep ? "border-l border-line" : undefined))}
+              {colunas.map((c) => th(c.id, c.rotulo, c.titulo, c.dir0, c.sep ? "border-l border-line" : undefined))}
             </tr>
           </thead>
           <tbody className="divide-y divide-line">
@@ -326,7 +364,7 @@ export default function TabelaPaises({
             ))}
             {exibirSem && sem.length > 0 && nCom > 0 && com.length > 0 && (
               <tr>
-                <td colSpan={COLUNAS.length + 1} className="bg-surface-2 px-2 py-1 text-xs font-medium text-muted">
+                <td colSpan={colunas.length + 1} className="bg-surface-2 px-2 py-1 text-xs font-medium text-muted">
                   Sem boletins recebidos ainda — apenas 2022 e 2018
                 </td>
               </tr>
@@ -340,7 +378,7 @@ export default function TabelaPaises({
               ))}
             {com.length === 0 && (!exibirSem || sem.length === 0) && (
               <tr>
-                <td colSpan={COLUNAS.length + 1} className="px-3 py-4 text-center text-sm text-muted">
+                <td colSpan={colunas.length + 1} className="px-3 py-4 text-center text-sm text-muted">
                   Nenhum país encontrado.
                 </td>
               </tr>

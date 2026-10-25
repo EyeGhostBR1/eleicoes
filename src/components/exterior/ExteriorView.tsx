@@ -4,7 +4,7 @@
 import Link from "next/link";
 import { useMemo } from "react";
 import { BLOCOS } from "@/lib/config";
-import { histDe, histPctBloco } from "@/lib/compare";
+import { histDe, histPctBloco, pct } from "@/lib/compare";
 import { useExteriorTurno, useParamsState } from "@/lib/client/hooks";
 import { fmtInt, fmtPct } from "@/lib/format";
 import type { ExtAgregado, HistByYear, Turno } from "@/lib/types";
@@ -19,23 +19,28 @@ import ComparacaoTurnos from "../turnos/ComparacaoTurnos";
 import RankingTurnos from "../turnos/RankingTurnos";
 import { turnosExterior } from "../turnos/exterior";
 
-function ReferenciaInteiro({ hist, turno }: { hist: HistByYear; turno: Turno }) {
-  const anos = (["2022", "2018"] as const).map((ano) => {
-    const h = histDe(hist, ano, turno);
-    return { ano, pt: histPctBloco(h, "pt"), bo: histPctBloco(h, "bolso") };
-  });
+function ReferenciaInteiro({ hist, turno, t1 }: { hist: HistByYear; turno: Turno; t1?: ExtAgregado | null }) {
+  const anos = [
+    ...(t1 && t1.validos > 0
+      ? [{ id: "t1", ano: "2026" as const, rotulo: "2026 · 1º turno", pt: pct(t1.pt, t1.validos), bo: pct(t1.bo, t1.validos) }]
+      : []),
+    ...(["2022", "2018"] as const).map((ano) => {
+      const h = histDe(hist, ano, turno);
+      return { id: ano, ano, rotulo: ano, pt: histPctBloco(h, "pt"), bo: histPctBloco(h, "bolso") };
+    }),
+  ];
   if (anos.every((a) => a.pt == null)) return null;
   return (
     <p className="text-xs text-muted">
       Exterior inteiro (resultado final):{" "}
       {anos.map((a, i) => (
-        <span key={a.ano}>
+        <span key={a.id}>
           {i > 0 && " · "}
-          {a.ano} {BLOCOS.pt.nomes[a.ano]}{" "}
+          {a.rotulo} {BLOCOS.pt.nomes[a.ano]}{" "}
           <span className="font-medium" style={{ color: "var(--c-pt)" }}>
             {fmtPct(a.pt, 1)}
           </span>{" "}
-          × Jair{" "}
+          × {a.ano === "2026" ? "Flávio" : "Jair"}{" "}
           <span className="font-medium" style={{ color: "var(--c-bolso)" }}>
             {fmtPct(a.bo, 1)}
           </span>
@@ -45,7 +50,18 @@ function ReferenciaInteiro({ hist, turno }: { hist: HistByYear; turno: Turno }) 
   );
 }
 
-function CartaoTotal({ total, histInteiro, turno }: { total: ExtAgregado; histInteiro: HistByYear; turno: Turno }) {
+function CartaoTotal({
+  total,
+  histInteiro,
+  turno,
+  t1,
+}: {
+  total: ExtAgregado;
+  histInteiro: HistByYear;
+  turno: Turno;
+  /** 2º turno: total do 1º turno de 2026 (exterior inteiro) */
+  t1?: ExtAgregado | null;
+}) {
   const completo = total.secoesTotal > 0 && total.secoesRecebidas >= total.secoesTotal;
   return (
     <Card className="p-4 sm:p-5" aria-labelledby="ext-total">
@@ -82,7 +98,7 @@ function CartaoTotal({ total, histInteiro, turno }: { total: ExtAgregado; histIn
         </p>
       )}
       <div className="mt-3">
-        <ReferenciaInteiro hist={histInteiro} turno={turno} />
+        <ReferenciaInteiro hist={histInteiro} turno={turno} t1={t1} />
       </div>
     </Card>
   );
@@ -135,8 +151,14 @@ export default function ExteriorView() {
       {data && data.total.secoesRecebidas > 0 && (
         <>
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            <CartaoTotal total={data.total} histInteiro={histInteiro} turno={turno} />
-            <ComparacaoJusta ext={data} histZz={histZz.data} turno={turno} carregandoHist={histZz.isLoading} />
+            <CartaoTotal total={data.total} histInteiro={histInteiro} turno={turno} t1={segundo ? ext1.data?.total : null} />
+            <ComparacaoJusta
+              ext={data}
+              ext1={segundo ? ext1.data : undefined}
+              histZz={histZz.data}
+              turno={turno}
+              carregandoHist={histZz.isLoading}
+            />
           </div>
           <CandidatosExterior ag={data.total} candidatos={data.candidatos} />
         </>
@@ -178,7 +200,14 @@ export default function ExteriorView() {
         {!histZz.data && !data ? (
           <SkeletonLinhas n={10} />
         ) : (
-          <TabelaPaises ext={data} histZz={histZz.data} turno={turno} qs={qs} nomeCidade={nomeCidade} />
+          <TabelaPaises
+            ext={data}
+            ext1={segundo ? ext1.data : undefined}
+            histZz={histZz.data}
+            turno={turno}
+            qs={qs}
+            nomeCidade={nomeCidade}
+          />
         )}
       </section>
 

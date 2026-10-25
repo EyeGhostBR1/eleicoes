@@ -136,7 +136,13 @@ export default function CidadeView({ uf, cd }: { uf: string; cd: string }) {
         {uf === "zz" && <CardCidadeExterior cd={cd} hist={hist} />}
       </div>
 
-      <ComparacaoBlocos live={live.data} hist={hist} turno={turno} carregando={carregandoLive} />
+      <ComparacaoBlocos
+        live={live.data}
+        hist={hist}
+        turno={turno}
+        carregando={carregandoLive}
+        t1={turnos?.t1 ? { pt: turnos.pt.p1, bo: turnos.bo.p1 } : null}
+      />
 
       {segundo && <ComparacaoTurnos linha={turnos} carregando={liveT1.isLoading} nomeLugar={nomeMun ?? "Município"} />}
 

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useDeferredValue, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useExteriorTurno, useLiveTurno, useMunicipiosTurno, useParamsState } from "@/lib/client/hooks";
-import { linhaTurnos, valTurnoDeLive, valTurnoDeMun } from "@/lib/turnos";
+import { linhaTurnos, valTurnoDeExt, valTurnoDeLive, valTurnoDeMun } from "@/lib/turnos";
 import { normalizar } from "@/lib/compare";
 import { UF_POR_SIGLA } from "@/lib/config";
 import { fmtInt } from "@/lib/format";
@@ -84,6 +84,11 @@ export default function EstadoView({ uf }: { uf: string }) {
     [segundo, munsT1.data, muns.data, tuplas, uf, qs],
   );
   const temTurnos = turnosMuns.length > 0;
+  // referência "2026 · 1º turno" nos cartões (exterior: total dos boletins do 1º turno = exterior inteiro)
+  const refT1 = useMemo(() => {
+    const v = exterior ? valTurnoDeExt(extT1.data?.total) : valTurnoDeLive(liveT1.data);
+    return segundo && v ? { pt: v.pt, bo: v.bo } : null;
+  }, [exterior, extT1.data, liveT1.data, segundo]);
 
   // dados do mapa por código IBGE
   const dadosMapa = useMemo(() => {
@@ -132,7 +137,7 @@ export default function EstadoView({ uf }: { uf: string }) {
         <AvisoParcial pct={live.data?.totais.pctTotalizado} />
       </div>
 
-      <ComparacaoBlocos live={live.data} hist={hist} turno={turno} carregando={carregandoLive} />
+      <ComparacaoBlocos live={live.data} hist={hist} turno={turno} carregando={carregandoLive} t1={refT1} />
 
       {segundo && (
         <ComparacaoTurnos
