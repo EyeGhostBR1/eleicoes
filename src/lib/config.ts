@@ -112,3 +112,12 @@ export const TURNO_PADRAO: Turno = 2;
  * e para não fazer polling desses dados na comparação 1º × 2º turno.
  */
 export const TURNOS_FINALIZADOS: Turno[] = [1];
+
+/**
+ * Fechamento das urnas (horário de Brasília) em cada turno de 2026: início do "tempo de apuração"
+ * no painel 1º × 2º turno. 1º turno: 17h; 2º turno: 19h, por decisão do STF.
+ */
+export const FECHAMENTO_URNAS: Record<Turno, string> = {
+  1: "2026-10-04T17:00:00-03:00",
+  2: "2026-10-25T19:00:00-03:00",
+};

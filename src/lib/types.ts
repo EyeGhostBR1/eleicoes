@@ -335,3 +335,83 @@ export interface EstimativaResponse {
   /** margem histórica (p.p.) do modelo para o % apurado atual, medida no backtest */
   margemHistorica: number | null;
 }
+
+// ---------------------------------------------------------------------------
+// Tempo de apuração — /api/tse/tempos (painel 1º × 2º turno)
+// ---------------------------------------------------------------------------
+
+/** Ritmo da apuração de um lugar (Brasil ou UF) a partir do acompanhamento do TSE. */
+export interface TemposLugar {
+  /** % de seções totalizadas agora */
+  pa: number;
+  munTotal: number;
+  /** municípios com a apuração concluída */
+  munConcluidos: number;
+  /** eleitorado total (soma dos municípios) */
+  eleitorado: number;
+  /**
+   * % do eleitorado em municípios com a apuração concluída, a cada `passoMin` minutos desde o
+   * fechamento das urnas (índice 0 = fechamento). Termina na última conclusão (turno encerrado)
+   * ou no momento da resposta (turno em andamento).
+   */
+  curva: number[];
+  /** minutos após o fechamento em que o eleitorado em municípios concluídos atingiu 50%, 90% e 100% */
+  m50: number | null;
+  m90: number | null;
+  m100: number | null;
+  /** municípios concluídos sem horário utilizável (retotalizados muito depois): fora da curva */
+  tardios: number;
+}
+
+export interface TemposMunicipio {
+  /** minutos após o fechamento em que o município concluiu a apuração (null = não concluído / sem horário) */
+  m: number | null;
+  /** eleitorado */
+  te: number;
+  /** % de seções totalizadas */
+  pa: number;
+}
+
+export interface TemposResponse {
+  turno: Turno;
+  geradoEm: string;
+  /** fechamento das urnas (ISO, horário de Brasília) */
+  fechamento: string;
+  passoMin: number;
+  /** minutos entre o fechamento e a geração da resposta */
+  agoraMin: number;
+  br: TemposLugar;
+  /** chave = UF minúscula (sem o exterior) */
+  ufs: Record<string, TemposLugar | null>;
+  /** com ?uf=: tempo de cada município da UF (chave = código TSE) */
+  municipios?: Record<string, TemposMunicipio>;
+}
+
+// ---------------------------------------------------------------------------
+// Maiores cidades — /api/tse/cidades (painel 1º × 2º turno)
+// ---------------------------------------------------------------------------
+
+export interface CidadeResultado {
+  cd: string;
+  uf: string;
+  nome: string;
+  /** null = TSE ainda sem dados do município neste turno */
+  r: {
+    pa: number;
+    vv: number;
+    pt: number;
+    bo: number;
+    comp: number;
+    /** eleitorado */
+    ap: number;
+    /** última totalização (ISO); num município concluído, o momento da conclusão */
+    atualizadoEm: string | null;
+    finalizado: boolean;
+  } | null;
+}
+
+export interface CidadesResponse {
+  turno: Turno;
+  geradoEm: string;
+  cidades: CidadeResultado[];
+}

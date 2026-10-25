@@ -7,6 +7,7 @@ import { REFRESH_MS, TURNOS_FINALIZADOS, TURNO_PADRAO } from "../config";
 import type {
   Ambiente,
   BoletinsResponse,
+  CidadesResponse,
   EstadosResponse,
   ExteriorResponse,
   HistBrFile,
@@ -14,6 +15,7 @@ import type {
   LiveResult,
   MunicipioTuple,
   MunicipiosResponse,
+  TemposResponse,
   Turno,
 } from "../types";
 
@@ -146,6 +148,24 @@ export function useMunicipiosTurno(uf: string | null, turno: Turno) {
     uf ? `/api/tse/municipios?uf=${uf}&turno=${turno}&amb=oficial` : null,
     fetchJson,
     optsTurno(turno, 60_000),
+  );
+}
+
+/** Ritmo da apuração (Brasil, UFs e, com `uf`, os municípios da UF) de um turno. */
+export function useTempos(turno: Turno, uf: string | null) {
+  return useSWR<TemposResponse, HttpError>(
+    `/api/tse/tempos?turno=${turno}&amb=oficial${uf ? `&uf=${uf}` : ""}`,
+    fetchJson,
+    optsTurno(turno, 60_000),
+  );
+}
+
+/** Resultado e andamento das 50 maiores cidades num turno. */
+export function useCidades(turno: Turno | null) {
+  return useSWR<CidadesResponse, HttpError>(
+    turno ? `/api/tse/cidades?turno=${turno}&amb=oficial` : null,
+    fetchJson,
+    optsTurno(turno ?? 2, 60_000),
   );
 }
 

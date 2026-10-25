@@ -21,6 +21,11 @@
   --warn-bg: #fde047;
   --warn-fg: #3f2a00;
   --focus: #2563eb;
+  /* gráficos (painel): marcas por candidato, série de referência (1º turno) e série em foco */
+  --viz-pt: #d62828;
+  --viz-bo: #1d4ed8;
+  --viz-ref: #7c8698;
+  --viz-foco: #0f172a;
   color-scheme: light;
 }
 
@@ -42,6 +47,10 @@
     --warn-bg: #facc15;
     --warn-fg: #2b1d00;
     --focus: #60a5fa;
+    --viz-pt: #ef4444;
+    --viz-bo: #5b8def;
+    --viz-ref: #8b95a8;
+    --viz-foco: #f8fafc;
     color-scheme: dark;
   }
 }

@@ -26,6 +26,7 @@ export {
   type MunicipiosOpts,
   type MunicipioCfg,
 } from "./service";
+export { getTempos, PASSO_MIN } from "./tempos";
 export { urlResultado, urlAcompanhamento, urlConfigMunicipios, codigoEleicao, eleicao6 } from "./urls";
 export {
   parseParamsTse,
