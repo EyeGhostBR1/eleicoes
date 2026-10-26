@@ -13,7 +13,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { type ReactNode, useMemo } from "react";
 import { useCidades, useEstadosTurno, useMunicipiosTurno, useTempos } from "@/lib/client/hooks";
 import { pct } from "@/lib/compare";
-import { FECHAMENTO_URNAS, UFS, UF_POR_SIGLA } from "@/lib/config";
+import { FECHAMENTO_URNAS, TURNOS_FINALIZADOS, UFS, UF_POR_SIGLA } from "@/lib/config";
 import { fmtInt, fmtPct } from "@/lib/format";
 import { linhaTurnos, valTurnoDeLive } from "@/lib/turnos";
 import type { CidadeResultado, LiveMunRow, TemposLugar, TemposMunicipio, TemposResponse } from "@/lib/types";
@@ -38,6 +38,8 @@ import { curvaVantagem, estender, fmtDuracao, fmtVantagem, minutosApos, relogio,
 const F1 = FECHAMENTO_URNAS[1];
 const F2 = FECHAMENTO_URNAS[2];
 const ORDEM_REGIAO = ["Norte", "Nordeste", "Centro-Oeste", "Sudeste", "Sul"];
+/** 2º turno encerrado: comparações "no mesmo horário" passam a usar o fim da apuração do 2º turno */
+const ENCERRADO2 = TURNOS_FINALIZADOS.includes(2);
 const UFS_PAINEL = UFS.filter((u) => u.sigla !== "zz");
 
 const SERIE_T1 = { id: "t1", rotulo: "1º turno (urnas fecharam 17h)", curto: "1º turno", cor: "var(--viz-ref)", tracejado: true, fechamento: F1 };
@@ -65,26 +67,43 @@ function seriesRitmo(t1: TemposLugar | null | undefined, t2: TemposLugar | null 
   ];
 }
 
-function Relogio({ t1, t2, tempos2, pa2 }: { t1: TemposLugar | null | undefined; t2: TemposLugar | null | undefined; tempos2: TemposResponse | undefined; pa2: number | null }) {
+function Relogio({
+  t1,
+  t2,
+  tempos2,
+  pa2,
+  refMin,
+}: {
+  t1: TemposLugar | null | undefined;
+  t2: TemposLugar | null | undefined;
+  tempos2: TemposResponse | undefined;
+  pa2: number | null;
+  /** minuto de comparação: agora (apuração em andamento) ou o fim da apuração do 2º turno */
+  refMin: number;
+}) {
   const agora = tempos2?.agoraMin ?? null;
   const conc2 = t2?.curva.length ? t2.curva[t2.curva.length - 1] : null;
-  const mesmo1 = t1 && agora != null && tempos2 ? valorNaCurva(t1.curva, tempos2.passoMin, agora, true) : null;
+  const mesmo1 = t1 && tempos2 ? valorNaCurva(t1.curva, tempos2.passoMin, refMin, true) : null;
   const dif = conc2 != null && mesmo1 != null ? conc2 - mesmo1 : null;
   return (
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-      <Tile
-        rotulo="Tempo desde o fechamento (19h)"
-        valor={agora != null && agora >= 0 ? fmtDuracao(agora) : "—"}
-        sub={agora != null ? `agora: ${relogio(F2, agora)}` : undefined}
-      />
-      <Tile rotulo="Seções apuradas (2º turno)" valor={pa2 != null ? fmtPct(pa2, 1) : "—"} sub="o que o TSE mostra agora" />
+      {ENCERRADO2 ? (
+        <Tile rotulo="2º turno encerrado" valor="19h" sub={`urnas fecharam às 19h · última conclusão às ${relogio(F2, refMin)}`} />
+      ) : (
+        <Tile
+          rotulo="Tempo desde o fechamento (19h)"
+          valor={agora != null && agora >= 0 ? fmtDuracao(agora) : "—"}
+          sub={agora != null ? `agora: ${relogio(F2, agora)}` : undefined}
+        />
+      )}
+      <Tile rotulo="Seções apuradas (2º turno)" valor={pa2 != null ? fmtPct(pa2, 1) : "—"} sub={ENCERRADO2 ? "resultado final do TSE" : "o que o TSE mostra agora"} />
       <Tile
         rotulo="Eleitorado em municípios concluídos"
         valor={conc2 != null ? fmtPct(conc2, 1) : "—"}
         sub={
           mesmo1 != null ? (
             <>
-              1º turno no mesmo horário: {fmtPct(mesmo1, 1)}
+              1º turno {ENCERRADO2 ? "no mesmo tempo" : "no mesmo horário"}: {fmtPct(mesmo1, 1)}
               {dif != null && ` (${dif >= 0 ? "+" : "−"}${fmtPct(Math.abs(dif), 1).replace("%", "")} p.p.)`}
             </>
           ) : undefined
@@ -97,17 +116,17 @@ function Relogio({ t1, t2, tempos2, pa2 }: { t1: TemposLugar | null | undefined;
       />
       <Tile
         rotulo="2º turno: concluído em"
-        valor={t2?.m100 != null ? fmtDuracao(t2.m100) : "em andamento"}
+        valor={t2?.m100 != null ? fmtDuracao(t2.m100) : ENCERRADO2 ? "—" : "em andamento"}
         sub={t2 ? `50% em ${t2.m50 != null ? fmtDuracao(t2.m50) : "—"} · 90% em ${t2.m90 != null ? fmtDuracao(t2.m90) : "—"}` : undefined}
       />
     </div>
   );
 }
 
-function ladoCidade(c: CidadeResultado | undefined, fech: string): LadoTurno | null {
+function ladoCidade(c: CidadeResultado | undefined, fech: string, encerrado: boolean): LadoTurno | null {
   const r = c?.r;
   if (!r || !(r.vv > 0)) return null;
-  const completo = r.pa >= 99.995;
+  const completo = r.pa >= 99.995 || encerrado;
   return {
     pt: pct(r.pt, r.vv),
     bo: pct(r.bo, r.vv),
@@ -119,7 +138,7 @@ function ladoCidade(c: CidadeResultado | undefined, fech: string): LadoTurno | n
   };
 }
 
-function ladoMunicipio(row: LiveMunRow | undefined, tm: TemposMunicipio | undefined): LadoTurno | null {
+function ladoMunicipio(row: LiveMunRow | undefined, tm: TemposMunicipio | undefined, encerrado: boolean): LadoTurno | null {
   if (!row || !(row.vv > 0)) return null;
   return {
     pt: pct(row.pt, row.vv),
@@ -127,7 +146,7 @@ function ladoMunicipio(row: LiveMunRow | undefined, tm: TemposMunicipio | undefi
     vpt: row.pt,
     vbo: row.bo,
     pa: row.pa,
-    completo: row.pa >= 99.995,
+    completo: row.pa >= 99.995 || encerrado,
     m: tm?.m ?? null,
   };
 }
@@ -159,7 +178,11 @@ export default function PainelView() {
   const T1 = tempos1.data;
   const T2 = tempos2.data;
   const passo = T2?.passoMin ?? T1?.passoMin ?? 5;
-  const agora2 = T2?.agoraMin ?? 0;
+  // minuto de referência das comparações "no mesmo horário": agora ou, com o 2º turno encerrado,
+  // o fim da apuração do 2º turno (última conclusão)
+  const fim2 = T2 ? (T2.br.curva.length - 1) * passo : 0;
+  const agora2 = ENCERRADO2 ? fim2 : (T2?.agoraMin ?? 0);
+  const agoraGrafico = T2 && !ENCERRADO2 ? agora2 : null;
   const lugar1 = uf ? T1?.ufs[uf] : T1?.br;
   const lugar2 = uf ? T2?.ufs[uf] : T2?.br;
   const nomeLugar = uf ? UF_POR_SIGLA[uf].nome : "Brasil";
@@ -228,8 +251,8 @@ export default function PainelView() {
       return montarLinha(
         { id: c.cd, nome: c.nome, sub: c.uf.toUpperCase(), href: `/cidade/${c.uf}/${c.cd}` },
         b?.r?.ap || a?.r?.ap || 0,
-        ladoCidade(a, F1),
-        ladoCidade(b, F2),
+        ladoCidade(a, F1, true),
+        ladoCidade(b, F2, ENCERRADO2),
       );
     });
   }, [cid1.data, cid2.data]);
@@ -245,8 +268,8 @@ export default function PainelView() {
       return montarLinha(
         { id: cd, nome, href: `/cidade/${uf}/${cd}` },
         r2?.ap || r1?.ap || T2?.municipios?.[cd]?.te || 0,
-        ladoMunicipio(r1, T1?.municipios?.[cd]),
-        ladoMunicipio(r2, T2?.municipios?.[cd]),
+        ladoMunicipio(r1, T1?.municipios?.[cd], true),
+        ladoMunicipio(r2, T2?.municipios?.[cd], ENCERRADO2),
       );
     });
   }, [uf, idx.porUf, mun1.data, mun2.data, T1, T2]);
@@ -331,7 +354,7 @@ export default function PainelView() {
 
       {erro && <ErroCarga msg={`Tempo de apuração: ${erro.message}`} onRetry={() => (void tempos1.mutate(), void tempos2.mutate())} />}
 
-      {!T1 && !T2 ? <Skeleton className="h-24 w-full" /> : <Relogio t1={lugar1} t2={lugar2} tempos2={T2} pa2={res2?.totais.pctTotalizado ?? lugar2?.pa ?? null} />}
+      {!T1 && !T2 ? <Skeleton className="h-24 w-full" /> : <Relogio t1={lugar1} t2={lugar2} tempos2={T2} pa2={res2?.totais.pctTotalizado ?? lugar2?.pa ?? null} refMin={agora2} />}
 
       <Card className="p-4 sm:p-5">
         <SectionTitle sub="% do eleitorado em municípios com a apuração concluída, por tempo depois do fechamento das urnas">
@@ -348,7 +371,7 @@ export default function PainelView() {
             ticksY={[0, 25, 50, 75, 100]}
             fmtY={fmtPctEixo}
             fmtValor={fmtPct1}
-            agoraMin={T2 ? agora2 : null}
+            agoraMin={agoraGrafico}
             ariaLabel={`Ritmo da apuração em ${nomeLugar}: 1º turno e 2º turno`}
           />
         )}
@@ -371,7 +394,7 @@ export default function PainelView() {
               fmtY={(v) => (v === 0 ? "0" : `${v > 0 ? "+" : "−"}${Math.abs(v)}`)}
               fmtValor={fmtVantagem}
               polaridade={{ acima: "Lula à frente", abaixo: "Flávio à frente" }}
-              agoraMin={T2 ? agora2 : null}
+              agoraMin={agoraGrafico}
               ariaLabel={`Vantagem acumulada nos municípios concluídos em ${nomeLugar}: 1º e 2º turno`}
             />
           )}
@@ -405,7 +428,7 @@ export default function PainelView() {
                       <span className="text-[11px] font-normal text-muted">{u.regiao}</span>
                     </button>
                     <p className="text-[11px] text-muted">
-                      2º: {pctInteiro(agoraB)} agora · 1º: {pctInteiro(a ? valorNaCurva(a.curva, passo, agora2, true) : null)}
+                      2º: {pctInteiro(agoraB)}{ENCERRADO2 ? "" : " agora"} · 1º: {pctInteiro(a ? valorNaCurva(a.curva, passo, agora2, true) : null)}
                     </p>
                     <GraficoTempo
                       compacto
@@ -417,7 +440,7 @@ export default function PainelView() {
                       fmtY={fmtPctEixo}
                       fmtValor={fmtPct1}
                       altura={96}
-                      agoraMin={T2 ? agora2 : null}
+                      agoraMin={agoraGrafico}
                       ariaLabel={`Ritmo da apuração em ${u.nome}`}
                     />
                   </div>

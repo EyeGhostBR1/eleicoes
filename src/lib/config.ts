@@ -108,10 +108,12 @@ export const REFRESH_MS = 30_000;
 export const TURNO_PADRAO: Turno = 2;
 
 /**
- * Turnos de 2026 já totalizados por completo (o 1º turno, em 04/10/2026). Usado para cache longo
- * e para não fazer polling desses dados na comparação 1º × 2º turno.
+ * Turnos de 2026 encerrados: 1º turno (04/10/2026) e 2º turno (25/10/2026, apuração considerada
+ * encerrada). Usado para cache longo, para não fazer polling desses dados e — no 2º turno — para
+ * comparar os votos com o 1º turno mesmo que o TSE não chegue a 100% das seções em algum lugar
+ * (seções não instaladas/pendentes).
  */
-export const TURNOS_FINALIZADOS: Turno[] = [1];
+export const TURNOS_FINALIZADOS: Turno[] = [1, 2];
 
 /**
  * Fechamento das urnas (horário de Brasília) em cada turno de 2026: início do "tempo de apuração"

@@ -31,7 +31,7 @@ export interface ValoresLugar {
   pt18: number | null;
   bo18: number | null;
   /**
-   * 1º × 2º turno de 2026 (só na página do 2º turno; null até o lugar ter 100% apurado):
+   * 1º × 2º turno de 2026 (só na página do 2º turno; null até a apuração do lugar terminar):
    * crescimento dos votos de cada um vs os próprios votos do 1º turno (%) e saldo de votos novos
    * (votos ganhos por Lula − por Flávio, em % dos válidos do 1º turno).
    */
@@ -84,7 +84,7 @@ export const METRICAS: Metrica[] = [
     bloco: "pt",
     escala: 30,
     explicacao:
-      "Crescimento dos votos de Lula no 2º turno em relação aos votos dele no 1º turno (%). Vermelho: ganhou votos; azul: perdeu. Só lugares com 100% apurado.",
+      "Crescimento dos votos de Lula no 2º turno em relação aos votos dele no 1º turno (%). Vermelho: ganhou votos; azul: perdeu. Só lugares com a apuração concluída.",
   },
   {
     id: "boT",
@@ -95,7 +95,7 @@ export const METRICAS: Metrica[] = [
     bloco: "bolso",
     escala: 30,
     explicacao:
-      "Crescimento dos votos de Flávio no 2º turno em relação aos votos dele no 1º turno (%). Azul: ganhou votos; vermelho: perdeu. Só lugares com 100% apurado.",
+      "Crescimento dos votos de Flávio no 2º turno em relação aos votos dele no 1º turno (%). Azul: ganhou votos; vermelho: perdeu. Só lugares com a apuração concluída.",
   },
   {
     id: "margemT",
@@ -105,7 +105,7 @@ export const METRICAS: Metrica[] = [
     turnos: true,
     escala: 10,
     explicacao:
-      "Votos ganhos por Lula − votos ganhos por Flávio entre os turnos, em % dos votos válidos do 1º turno. Vermelho: Lula ganhou mais; azul: Flávio ganhou mais. Só lugares com 100% apurado.",
+      "Votos ganhos por Lula − votos ganhos por Flávio entre os turnos, em % dos votos válidos do 1º turno. Vermelho: Lula ganhou mais; azul: Flávio ganhou mais. Só lugares com a apuração concluída.",
   },
   {
     id: "pt22",

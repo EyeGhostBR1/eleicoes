@@ -2,7 +2,7 @@
 // Tabela 1º × 2º turno de 2026, lado a lado por candidato (como a tabela 2026 × 2022 × 2018):
 // para Lula e para Flávio, votos no 1º turno, votos no 2º turno, votos a mais/a menos e
 // crescimento %. Ordenável, com filtro, paginação e linha de total no rodapé.
-// Diferença e crescimento só aparecem com o 2º turno 100% apurado no lugar.
+// Diferença e crescimento só aparecem com a apuração do 2º turno concluída no lugar.
 import Link from "next/link";
 import { type ReactNode, useDeferredValue, useMemo, useState } from "react";
 import { BLOCOS } from "@/lib/config";
@@ -229,7 +229,7 @@ export default function TabelaTurnos({
   return (
     <Card className="space-y-3 p-4">
       <SectionTitle
-        sub={`Votos de Lula e de Flávio em cada um dos ${plural} nos dois turnos de 2026. Δ votos e crescimento comparam cada candidato com os próprios votos do 1º turno e aparecem quando o lugar tem 100% apurado no 2º turno.`}
+        sub={`Votos de Lula e de Flávio em cada um dos ${plural} nos dois turnos de 2026. Δ votos e crescimento comparam cada candidato com os próprios votos do 1º turno e aparecem quando a apuração do 2º turno termina no lugar.`}
       >
         {titulo}
       </SectionTitle>
@@ -255,7 +255,7 @@ export default function TabelaTurnos({
               />
             )}
             <span className="text-muted">
-              {fmtInt(completos)} de {fmtInt(comT1.length)} {plural} com 100% apurado no 2º turno
+              {fmtInt(completos)} de {fmtInt(comT1.length)} {plural} com a apuração do 2º turno concluída
               {viradas > 0 && ` · liderança virou em ${fmtInt(viradas)}`}
             </span>
           </div>

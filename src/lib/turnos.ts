@@ -3,8 +3,10 @@
 // A medida principal é o crescimento em VOTOS, comparado com os próprios votos do 1º turno
 // (absoluto e em %). O % dos válidos engana: com só dois candidatos no 2º turno, o % de ambos
 // sobe em quase todo lugar só porque os outros candidatos saíram.
-// Votos só são comparáveis com o 2º turno 100% apurado no lugar (`completo`); antes disso o
-// crescimento fica null (a contagem parcial pareceria queda).
+// Votos só são comparáveis com a apuração do 2º turno concluída no lugar (`completo`: 100% das
+// seções, ou o 2º turno marcado como encerrado em TURNOS_FINALIZADOS); antes disso o crescimento
+// fica null (a contagem parcial pareceria queda).
+import { TURNOS_FINALIZADOS } from "./config";
 import { deltaPP, pct } from "./compare";
 import type { BlocoId, ExtAgregado, HistResult, LiveMunRow, LiveResult } from "./types";
 
@@ -83,9 +85,9 @@ export interface DeltaTurno {
   dpp: number | null;
   v1: number | null;
   v2: number | null;
-  /** Δ votos (2º − 1º); só com o 2º turno 100% apurado no lugar */
+  /** Δ votos (2º − 1º); só com a apuração do 2º turno concluída no lugar */
   dv: number | null;
-  /** crescimento dos votos em relação aos do 1º turno (%): (v2 ÷ v1 − 1) × 100; só com 100% apurado */
+  /** crescimento dos votos em relação aos do 1º turno (%): (v2 ÷ v1 − 1) × 100; só com a apuração concluída */
   cresc: number | null;
 }
 
@@ -99,11 +101,11 @@ export interface LinhaTurnos {
   t2: ValTurno | null;
   pt: DeltaTurno;
   bo: DeltaTurno;
-  /** 2º turno 100% apurado no lugar (votos comparáveis com o 1º turno) */
+  /** apuração do 2º turno concluída no lugar (votos comparáveis com o 1º turno) */
   completo: boolean;
   /**
    * Saldo de votos novos: (votos ganhos por Lula − votos ganhos por Flávio) ÷ válidos do 1º turno × 100.
-   * Positivo = Lula ganhou mais votos que Flávio entre os turnos. Só com 100% apurado.
+   * Positivo = Lula ganhou mais votos que Flávio entre os turnos. Só com a apuração concluída.
    */
   saldo: number | null;
   /** quem liderava no 1º e lidera no 2º turno (só entre Lula e Flávio) */
@@ -120,9 +122,12 @@ function liderVal(v: ValTurno | null): BlocoId | null {
   return v.vpt > v.vbo ? "pt" : "bolso";
 }
 
-/** 2º turno totalmente apurado (pa = % de seções totalizadas / boletins recebidos). */
+/** 2º turno de 2026 considerado encerrado: o resultado vale como final mesmo sem 100% das seções. */
+const SEGUNDO_TURNO_ENCERRADO = TURNOS_FINALIZADOS.includes(2);
+
+/** Apuração do 2º turno concluída no lugar (pa = % de seções totalizadas / boletins recebidos). */
 export function turnoCompleto(v: ValTurno | null): boolean {
-  return (v?.pa ?? 0) >= 99.995;
+  return !!v && (SEGUNDO_TURNO_ENCERRADO || v.pa >= 99.995);
 }
 
 function delta(v1: ValTurno | null, v2: ValTurno | null, b: BlocoId): DeltaTurno {

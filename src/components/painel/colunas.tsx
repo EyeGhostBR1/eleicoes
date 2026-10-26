@@ -155,7 +155,7 @@ export function colunasLugares(fech1: string, fech2: string, agoraMin2: number):
       id: "dvpt",
       grupo: "cmp",
       rotulo: "Δ votos Lula",
-      titulo: "Votos de Lula no 2º turno − no 1º turno (com os dois turnos 100% apurados)",
+      titulo: "Votos de Lula no 2º turno − no 1º turno (com a apuração dos dois turnos concluída)",
       get: (l) => votos(l, "pt"),
       render: (l) => (l.t2 && !l.t2.completo ? <span className="text-xs text-muted">apurando</span> : <DeltaVotos v={votos(l, "pt")} />),
     },
@@ -163,7 +163,7 @@ export function colunasLugares(fech1: string, fech2: string, agoraMin2: number):
       id: "dvbo",
       grupo: "cmp",
       rotulo: "Δ votos Flávio",
-      titulo: "Votos de Flávio no 2º turno − no 1º turno (com os dois turnos 100% apurados)",
+      titulo: "Votos de Flávio no 2º turno − no 1º turno (com a apuração dos dois turnos concluída)",
       get: (l) => votos(l, "bolso"),
       render: (l) => (l.t2 && !l.t2.completo ? <span className="text-xs text-muted">apurando</span> : <DeltaVotos v={votos(l, "bolso")} />),
     },
@@ -295,7 +295,7 @@ export function colunasRitmo(): ColunaPainel<LinhaRitmo>[] {
 }
 
 export const GRUPOS_RITMO = {
-  agora: { rotulo: "Agora (mesmo tempo após o fechamento)", cor: "var(--viz-foco)" },
+  agora: { rotulo: "No mesmo tempo após o fechamento", cor: "var(--viz-foco)" },
   m50: { rotulo: "50% concluído em" },
   m90: { rotulo: "90% concluído em" },
   m100: { rotulo: "100% concluído em" },

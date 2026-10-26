@@ -3,7 +3,7 @@
 // e em 2026 (Lula × Flávio), lado a lado — no Brasil, por estado e por município de um estado.
 //
 // Crescimento = votos do candidato no 2º turno ÷ votos dele no 1º turno − 1 (o % dos válidos não
-// serve: com dois candidatos no 2º turno ele sobe para ambos). 2026 só com o lugar 100% apurado.
+// serve: com dois candidatos no 2º turno ele sobe para ambos). 2026 só com a apuração concluída.
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { type ReactNode, useDeferredValue, useMemo, useState } from "react";
@@ -110,7 +110,7 @@ function Resumo({ l, nome }: { l: LinhaCresc | null; nome: string }) {
             </dl>
             <p className="mt-2 text-sm">
               {d == null ? (
-                <span className="text-muted">Comparação disponível com o 2º turno de 2026 100% apurado.</span>
+                <span className="text-muted">Comparação disponível quando a apuração do 2º turno de 2026 terminar.</span>
               ) : (
                 <>
                   {NOMES[b].a26} em 2026 cresceu{" "}
@@ -269,7 +269,7 @@ function Tabela({ linhas, rodape, rotuloLugar, plural }: { linhas: LinhaCresc[];
           />
         )}
         <span className="text-muted">
-          {fmtInt(completos)} de {fmtInt(linhas.length)} {plural} com o 2º turno de 2026 100% apurado
+          {fmtInt(completos)} de {fmtInt(linhas.length)} {plural} com a apuração do 2º turno de 2026 concluída
         </span>
       </div>
       <div className="tabela-scroll rounded-lg border border-line bg-surface">
@@ -448,7 +448,7 @@ export default function CrescimentoView() {
         )}
         <p className="text-xs text-muted">
           &quot;Diferença&quot; = crescimento em 2026 menos crescimento em 2022, em pontos percentuais. Ex.: Flávio +14% em 2026 e
-          Jair +9% em 2022 → +5 p.p. Os números de 2026 aparecem quando o lugar tem 100% apurado no 2º turno.
+          Jair +9% em 2022 → +5 p.p. Os números de 2026 aparecem quando a apuração do 2º turno termina no lugar.
         </p>
       </Card>
     </div>

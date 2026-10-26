@@ -4,7 +4,7 @@
 // A medida principal é o crescimento em VOTOS de cada candidato em relação aos próprios votos do
 // 1º turno (absoluto e em %). O % dos válidos aparece só como contexto: com dois candidatos no
 // 2º turno, ele sobe para ambos só porque os outros candidatos saíram.
-// Os votos só são comparados com o 2º turno 100% apurado no lugar.
+// Os votos só são comparados com a apuração do 2º turno concluída no lugar.
 import type { ReactNode } from "react";
 import { BLOCOS } from "@/lib/config";
 import { deltaPP } from "@/lib/compare";
@@ -38,7 +38,7 @@ export function Crescimento({ v, className }: { v: number | null; className?: st
   );
 }
 
-/** Texto-resumo em votos (só com o 2º turno 100% apurado). */
+/** Texto-resumo em votos (só com a apuração do 2º turno concluída). */
 export function frase(l: LinhaTurnos): string | null {
   if (l.pt.dv == null || l.bo.dv == null) return null;
   const um = (nome: string, d: DeltaTurno) => {
